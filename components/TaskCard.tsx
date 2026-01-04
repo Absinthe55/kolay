@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Task, TaskStatus, TaskPriority, User } from '../types';
 
 interface TaskCardProps {
@@ -17,6 +17,20 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
   const [isImageExpanded, setIsImageExpanded] = useState<{url: string, title: string} | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(task.status === TaskStatus.COMPLETED || task.status === TaskStatus.CANCELLED);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Otomatik Görüldü İşaretleme
+  // Kart açıksa (isCollapsed false) ve bakan kişi yetkili ustaysa, 1.5 saniye sonra görüldü işaretle
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    if (!isCollapsed && user.role === 'USTA' && task.masterName === user.name && !task.seenAt && onMarkSeen) {
+        timer = setTimeout(() => {
+            onMarkSeen(task.id);
+        }, 1500);
+    }
+    return () => {
+        if (timer) clearTimeout(timer);
+    };
+  }, [isCollapsed, user.role, task.masterName, user.name, task.seenAt, task.id, onMarkSeen]);
 
   // Modern Dark Mode Renk Paletleri
   const statusConfig = {
@@ -63,7 +77,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
     const newCollapsed = !isCollapsed;
     setIsCollapsed(newCollapsed);
 
-    // Kartı açtığında (eğer ustaysa ve daha önce görülmediyse) görüldü işaretle
+    // Tıklayarak açtığında da hemen tetikle (yedek kontrol)
     if (!newCollapsed && user.role === 'USTA' && task.masterName === user.name && !task.seenAt && onMarkSeen) {
         onMarkSeen(task.id);
     }
