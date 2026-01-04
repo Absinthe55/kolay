@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Task, User, TaskStatus, TaskPriority } from './types';
 import { fetchTasks, saveTasks } from './services/dbService';
-import { generateTaskDescription } from './services/geminiService';
 import Layout from './components/Layout';
 import TaskCard from './components/TaskCard';
 
@@ -16,10 +15,9 @@ const App: React.FC = () => {
   
   // Form State for Adding Task
   const [newTaskMachine, setNewTaskMachine] = useState('');
-  const [newTaskProblem, setNewTaskProblem] = useState('');
+  const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskMaster, setNewTaskMaster] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
-  const [isAiGenerating, setIsAiGenerating] = useState(false);
 
   const masters = ['Usta Ahmet', 'Usta Mehmet', 'Usta Can', 'Usta Serkan'];
 
@@ -38,7 +36,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     refreshData();
-    // 30 saniyede bir otomatik yenileme (canlı veri hissi için)
     const interval = setInterval(refreshData, 30000);
     return () => clearInterval(interval);
   }, [refreshData]);
@@ -54,17 +51,14 @@ const App: React.FC = () => {
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTaskMachine || !newTaskProblem || !newTaskMaster) return alert("Lütfen tüm alanları doldurun.");
+    if (!newTaskMachine || !newTaskDescription || !newTaskMaster) return alert("Lütfen tüm alanları doldurun.");
 
-    setIsAiGenerating(true);
     try {
-      const aiDescription = await generateTaskDescription(newTaskMachine, newTaskProblem);
-      
       const newTask: Task = {
         id: Date.now().toString(),
         machineName: newTaskMachine,
         masterName: newTaskMaster,
-        description: aiDescription,
+        description: newTaskDescription,
         status: TaskStatus.PENDING,
         priority: newTaskPriority,
         createdAt: Date.now(),
@@ -80,14 +74,12 @@ const App: React.FC = () => {
       
       // Reset Form
       setNewTaskMachine('');
-      setNewTaskProblem('');
+      setNewTaskDescription('');
       setNewTaskMaster('');
       setNewTaskPriority(TaskPriority.MEDIUM);
       setActiveTab('tasks');
     } catch (err) {
       alert("Görev oluşturulurken bir hata oluştu.");
-    } finally {
-      setIsAiGenerating(false);
     }
   };
 
@@ -248,51 +240,34 @@ const App: React.FC = () => {
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Öncelik</label>
-                <select 
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
-                  value={newTaskPriority}
-                  onChange={(e) => setNewTaskPriority(e.target.value as TaskPriority)}
-                >
-                  {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Öncelik</label>
+              <select 
+                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
+                value={newTaskPriority}
+                onChange={(e) => setNewTaskPriority(e.target.value as TaskPriority)}
+              >
+                {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Problem Tanımı</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Görev Açıklaması / Talimatlar</label>
               <textarea 
-                placeholder="Örn: Ana piston valfinde yağ sızıntısı var ve basınç düşüyor."
+                placeholder="Örn: Ana piston valfinde yağ sızıntısı var. Lütfen keçeleri değiştirin ve basınç testi yapın."
                 className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
-                rows={4}
-                value={newTaskProblem}
-                onChange={(e) => setNewTaskProblem(e.target.value)}
+                rows={6}
+                value={newTaskDescription}
+                onChange={(e) => setNewTaskDescription(e.target.value)}
               />
-              <p className="mt-2 text-[10px] text-blue-600 font-bold flex items-center gap-1 uppercase italic">
-                <i className="fas fa-magic"></i> Gemini AI teknik talimat oluşturacaktır
-              </p>
             </div>
 
             <button 
               type="submit" 
-              disabled={isAiGenerating}
-              className={`w-full py-4 rounded-xl font-bold text-white shadow-xl shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2 ${
-                isAiGenerating ? 'bg-slate-400' : 'bg-blue-600'
-              }`}
+              className="w-full py-4 rounded-xl font-bold text-white shadow-xl shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2 bg-blue-600"
             >
-              {isAiGenerating ? (
-                <>
-                  <i className="fas fa-circle-notch animate-spin"></i>
-                  TEKNİK TALİMAT HAZIRLANIYOR...
-                </>
-              ) : (
-                <>
-                  <i className="fas fa-paper-plane"></i>
-                  GÖREVİ OLUŞTUR VE GÖNDER
-                </>
-              )}
+              <i className="fas fa-paper-plane"></i>
+              GÖREVİ OLUŞTUR VE GÖNDER
             </button>
           </form>
         </div>
