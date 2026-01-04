@@ -24,6 +24,8 @@ const DEFAULT_USTAS: Member[] = [
 const AUTO_CONNECT_URL = 'https://www.npoint.io/docs/c85115e1d1b4c3276a86';
 // Yerel depolamada yetkilendirme anahtarı
 const LOCAL_KEY_AUTH = 'hidro_auth';
+// Bildirim sesi (Kısa bip sesi)
+const NOTIFICATION_SOUND = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -62,6 +64,50 @@ const App: React.FC = () => {
   // Request Form State
   const [newRequestContent, setNewRequestContent] = useState('');
 
+  // Bildirim Takibi için Ref (Son bilinen görev ID'leri)
+  const lastTaskIdsRef = useRef<Set<string>>(new Set());
+  const isFirstLoadRef = useRef(true);
+
+  // Bildirim İzni İsteme Fonksiyonu
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) {
+      alert("Bu tarayıcı bildirimleri desteklemiyor.");
+      return;
+    }
+    
+    if (Notification.permission !== 'granted') {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        // Test bildirimi
+        new Notification("Bildirimler Aktif", { 
+            body: "Yeni görev verildiğinde haber vereceğiz.",
+            icon: "https://cdn-icons-png.flaticon.com/512/3652/3652191.png"
+        });
+      }
+    } else {
+        alert("Bildirim izni zaten verilmiş.");
+    }
+  };
+
+  // Bildirim Gönderme Fonksiyonu
+  const sendNotification = (title: string, body: string) => {
+      if (Notification.permission === 'granted') {
+          // Titreşim (Mobil için)
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+
+          // Ses
+          const audio = new Audio(NOTIFICATION_SOUND);
+          audio.volume = 0.5;
+          audio.play().catch(e => console.log("Ses çalınamadı:", e));
+
+          // Görsel Bildirim
+          new Notification(title, { 
+              body: body,
+              icon: "https://cdn-icons-png.flaticon.com/512/10337/10337229.png" // İş/Tamir ikonu
+          });
+      }
+  };
+
   // Veri Yükleme
   const loadData = useCallback(async (forceId?: string) => {
     setLoading(true);
@@ -70,14 +116,20 @@ const App: React.FC = () => {
     
     setTasks(data.tasks);
     setRequests(data.requests);
-    // Eğer sunucudan liste gelmişse güncelle, yoksa varsayılanları koru
+    
+    // İlk yüklemede mevcut ID'leri kaydet ki bildirim gitmesin
+    if (isFirstLoadRef.current && data.tasks.length > 0) {
+        data.tasks.forEach(t => lastTaskIdsRef.current.add(t.id));
+        isFirstLoadRef.current = false;
+    }
+
     if (data.amirs && data.amirs.length > 0) setAmirList(data.amirs);
     if (data.ustas && data.ustas.length > 0) setUstaList(data.ustas);
     
     setLoading(false);
   }, [connectionId]);
 
-  // Otomatik Bağlantı, Periyodik Güncelleme ve Otomatik Login
+  // Otomatik Bağlantı, Periyodik Güncelleme ve Bildirim Kontrolü
   useEffect(() => {
     // 1. İlk açılışta veri yükle
     loadData();
@@ -99,7 +151,6 @@ const App: React.FC = () => {
     const initAutoConnect = async () => {
        const currentId = getStoredBinId();
        if (!currentId) {
-          console.log("Otomatik bağlantı başlatılıyor...");
           const autoId = extractBinId(AUTO_CONNECT_URL);
           const isValid = await checkConnection(autoId);
           if (isValid) {
@@ -108,6 +159,10 @@ const App: React.FC = () => {
              const data = await fetchAppData(autoId);
              setTasks(data.tasks);
              setRequests(data.requests);
+             // İlk yükleme olduğu için ID'leri sete at
+             data.tasks.forEach(t => lastTaskIdsRef.current.add(t.id));
+             isFirstLoadRef.current = false;
+
              if (data.amirs.length > 0) setAmirList(data.amirs);
              if (data.ustas.length > 0) setUstaList(data.ustas);
           }
@@ -115,14 +170,43 @@ const App: React.FC = () => {
     };
     initAutoConnect();
 
-    // 4. Periyodik güncelleme
+    // 4. Periyodik güncelleme ve Bildirim Kontrolü
     const interval = setInterval(() => {
       if (connectionId) {
         fetchAppData(connectionId).then(data => {
+            // State güncelle
             setTasks(data.tasks);
             setRequests(data.requests);
             if (data.amirs.length > 0) setAmirList(data.amirs);
             if (data.ustas.length > 0) setUstaList(data.ustas);
+
+            // BİLDİRİM MANTIĞI
+            // Eğer currentUser varsa kontrol et
+            if (currentUser) {
+                data.tasks.forEach(task => {
+                    // Eğer bu görev daha önce görülmemişse (Yeni ise)
+                    if (!lastTaskIdsRef.current.has(task.id)) {
+                        
+                        // 1. Durum: Ben USTAYIM ve görev BANA atanmış
+                        if (currentUser.role === 'USTA' && task.masterName === currentUser.name) {
+                            sendNotification(
+                                "🛠️ YENİ GÖREV!", 
+                                `${task.machineName} makinesinde yeni iş emriniz var.`
+                            );
+                        }
+                        // 2. Durum: Ben AMİRİM, sisteme herhangi bir görev eklendi (Opsiyonel, bilgi amaçlı)
+                        else if (currentUser.role === 'AMIR') {
+                             // Amirler için bildirim istenirse burası açılabilir, şimdilik sadece ustalara odaklı.
+                        }
+
+                        // ID'yi listeye ekle ki tekrar bildirim gitmesin
+                        lastTaskIdsRef.current.add(task.id);
+                    }
+                });
+            } else {
+                 // Login olmamışsa bile ID'leri güncelle ki login olunca eskiler için bildirim gitmesin
+                 data.tasks.forEach(t => lastTaskIdsRef.current.add(t.id));
+            }
         });
       }
     }, 5000); 
@@ -130,17 +214,15 @@ const App: React.FC = () => {
     return () => {
         clearInterval(interval);
     };
-  }, [connectionId, loadData]);
+  }, [connectionId, loadData, currentUser]); // currentUser değişince effect yenilenir, bu önemli
 
   const handleLoginClick = (member: Member, role: 'AMIR' | 'USTA') => {
       if (member.password && member.password.trim() !== '') {
-          // Şifre varsa modal aç
           setLoginModal({ show: true, member, role });
           setLoginPasswordInput('');
           setLoginError(false);
           setLoginRememberMe(false);
       } else {
-          // Şifre yoksa direkt giriş
           performLogin(member.name, role, false);
       }
   };
@@ -168,6 +250,11 @@ const App: React.FC = () => {
 
     if (remember) {
       localStorage.setItem(LOCAL_KEY_AUTH, JSON.stringify(user));
+    }
+    
+    // Giriş yapınca hemen izin iste (daha iyi UX)
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
     }
   };
 
@@ -357,6 +444,8 @@ const App: React.FC = () => {
 
     const updatedTasks = [newTask, ...tasks];
     setTasks(updatedTasks);
+    // Kendi oluşturduğumuz görevi bildirim listesine ekle ki bize bildirim gelmesin (zaten biz oluşturduk)
+    lastTaskIdsRef.current.add(newTask.id);
     
     setLoading(true);
     await saveAppData({ tasks: updatedTasks, requests, amirs: amirList, ustas: ustaList }, connectionId);
@@ -708,100 +797,28 @@ const App: React.FC = () => {
          </div>
       )}
 
-      {activeTab === 'add' && currentUser.role === 'AMIR' && (
-        <div className="animate-in slide-in-from-right duration-300 pb-24">
-          <h2 className="text-3xl font-black text-slate-100 tracking-tight mb-6 px-1">Yeni Görev</h2>
-          <form onSubmit={handleCreateTask} className="space-y-5 bg-slate-800 p-6 rounded-[2rem] border border-slate-700 shadow-xl shadow-slate-900/50 relative overflow-hidden">
-             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
-            {!connectionId && (
-                <div className="bg-orange-900/20 border border-orange-900/50 text-orange-400 p-4 rounded-xl text-xs font-bold flex items-center gap-3">
-                    <i className="fas fa-wifi-slash text-lg"></i>
-                    Yerel moddasınız. Veriler diğer cihazlara gitmeyebilir.
-                </div>
-            )}
-            <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Makine Adı</label>
-                <input type="text" className="w-full border-0 bg-slate-900 ring-1 ring-slate-700 rounded-2xl p-4 text-slate-100 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-slate-900 transition-all outline-none placeholder:font-normal placeholder:text-slate-600" value={newTaskMachine} onChange={e => setNewTaskMachine(e.target.value)} required placeholder="Örn: Enjeksiyon 3" />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Görevli Usta</label>
-                    <div className="relative">
-                        <select className="w-full appearance-none border-0 bg-slate-900 ring-1 ring-slate-700 rounded-2xl p-4 text-slate-100 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-slate-900 transition-all outline-none" value={newTaskMaster} onChange={e => setNewTaskMaster(e.target.value)} required>
-                            <option value="">Seçiniz...</option>
-                            {ustaList.map(u => <option key={u.name} value={u.name}>{u.name}</option>)}
-                        </select>
-                        <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"></i>
-                    </div>
-                </div>
-                 <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Öncelik</label>
-                    <div className="relative">
-                        <select className="w-full appearance-none border-0 bg-slate-900 ring-1 ring-slate-700 rounded-2xl p-4 text-slate-100 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-slate-900 transition-all outline-none" value={newTaskPriority} onChange={e => setNewTaskPriority(e.target.value as TaskPriority)}>
-                             {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
-                        </select>
-                         <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"></i>
-                    </div>
-                </div>
-            </div>
-
-            <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">İş Emri Detayı</label>
-                <textarea className="w-full border-0 bg-slate-900 ring-1 ring-slate-700 rounded-2xl p-4 text-slate-100 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:bg-slate-900 transition-all outline-none min-h-[120px] resize-none placeholder:text-slate-600" value={newTaskDescription} onChange={e => setNewTaskDescription(e.target.value)} required placeholder="Yapılacak işlemi detaylıca tarif ediniz..." />
-            </div>
-            
-            <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Fotoğraf (Opsiyonel)</label>
-                <div className="flex items-center gap-4">
-                  <label className="flex-1 cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-500 py-4 rounded-2xl ring-1 ring-slate-700 ring-dashed border-2 border-transparent hover:border-blue-500/50 flex flex-col items-center justify-center gap-2 transition-all group">
-                    <div className="w-10 h-10 bg-slate-800 rounded-full shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <i className="fas fa-camera text-blue-500 text-lg"></i>
-                    </div>
-                    <span className="text-xs font-bold">Fotoğraf Çek / Yükle</span>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      className="hidden" 
-                      ref={fileInputRef}
-                      onChange={handleImageChange}
-                    />
-                  </label>
-                  {newTaskImage && (
-                    <div className="relative w-24 h-24 rounded-2xl overflow-hidden shadow-lg ring-2 ring-slate-700">
-                      <img src={newTaskImage} alt="Önizleme" className="w-full h-full object-cover" />
-                      <button 
-                        type="button" 
-                        onClick={() => { setNewTaskImage(null); if(fileInputRef.current) fileInputRef.current.value = ''; }}
-                        className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md hover:bg-red-600"
-                      >
-                        <i className="fas fa-times"></i>
-                      </button>
-                    </div>
-                  )}
-                </div>
-            </div>
-
-            <button disabled={loading} className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-blue-900/40 hover:shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
-                {loading ? (
-                    <>
-                    <i className="fas fa-circle-notch animate-spin"></i>
-                    <span>İLETİLİYOR...</span>
-                    </>
-                ) : (
-                    <>
-                    <span>GÖREVİ YAYINLA</span>
-                    <i className="fas fa-paper-plane"></i>
-                    </>
-                )}
-            </button>
-          </form>
-        </div>
-      )}
-
       {activeTab === 'profile' && (
         <div className="animate-in slide-in-from-left duration-300 pb-24">
            <h2 className="text-3xl font-black text-slate-100 tracking-tight mb-6 px-1">Ayarlar</h2>
+
+           {/* Bildirim İzni Butonu */}
+           <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-md mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                 <div className="w-10 h-10 rounded-full bg-orange-900/30 text-orange-400 flex items-center justify-center">
+                    <i className="fas fa-bell"></i>
+                 </div>
+                 <div>
+                    <h3 className="text-sm font-bold text-slate-200">Bildirim Ayarı</h3>
+                    <p className="text-[10px] text-slate-500">Yeni görevlerden haberdar olun</p>
+                 </div>
+              </div>
+              <button 
+                onClick={requestNotificationPermission}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold rounded-lg transition-colors"
+              >
+                İZİN VER
+              </button>
+           </div>
            
            {isErkan && (
                <div className="bg-slate-800 p-6 rounded-[2rem] border border-blue-900/30 shadow-xl shadow-blue-900/10 mb-6 relative overflow-hidden group">
@@ -930,6 +947,97 @@ const App: React.FC = () => {
                  </button>
               </div>
            </div>
+        </div>
+      )}
+
+      {activeTab === 'add' && currentUser.role === 'AMIR' && (
+        <div className="animate-in slide-in-from-right duration-300 pb-24">
+          <h2 className="text-3xl font-black text-slate-100 tracking-tight mb-6 px-1">Yeni Görev</h2>
+          <form onSubmit={handleCreateTask} className="space-y-5 bg-slate-800 p-6 rounded-[2rem] border border-slate-700 shadow-xl shadow-slate-900/50 relative overflow-hidden">
+             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+            {!connectionId && (
+                <div className="bg-orange-900/20 border border-orange-900/50 text-orange-400 p-4 rounded-xl text-xs font-bold flex items-center gap-3">
+                    <i className="fas fa-wifi-slash text-lg"></i>
+                    Yerel moddasınız. Veriler diğer cihazlara gitmeyebilir.
+                </div>
+            )}
+            <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Makine Adı</label>
+                <input type="text" className="w-full border-0 bg-slate-900 ring-1 ring-slate-700 rounded-2xl p-4 text-slate-100 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-slate-900 transition-all outline-none placeholder:font-normal placeholder:text-slate-600" value={newTaskMachine} onChange={e => setNewTaskMachine(e.target.value)} required placeholder="Örn: Enjeksiyon 3" />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Görevli Usta</label>
+                    <div className="relative">
+                        <select className="w-full appearance-none border-0 bg-slate-900 ring-1 ring-slate-700 rounded-2xl p-4 text-slate-100 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-slate-900 transition-all outline-none" value={newTaskMaster} onChange={e => setNewTaskMaster(e.target.value)} required>
+                            <option value="">Seçiniz...</option>
+                            {ustaList.map(u => <option key={u.name} value={u.name}>{u.name}</option>)}
+                        </select>
+                        <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"></i>
+                    </div>
+                </div>
+                 <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Öncelik</label>
+                    <div className="relative">
+                        <select className="w-full appearance-none border-0 bg-slate-900 ring-1 ring-slate-700 rounded-2xl p-4 text-slate-100 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-slate-900 transition-all outline-none" value={newTaskPriority} onChange={e => setNewTaskPriority(e.target.value as TaskPriority)}>
+                             {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                         <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">İş Emri Detayı</label>
+                <textarea className="w-full border-0 bg-slate-900 ring-1 ring-slate-700 rounded-2xl p-4 text-slate-100 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:bg-slate-900 transition-all outline-none min-h-[120px] resize-none placeholder:text-slate-600" value={newTaskDescription} onChange={e => setNewTaskDescription(e.target.value)} required placeholder="Yapılacak işlemi detaylıca tarif ediniz..." />
+            </div>
+            
+            <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Fotoğraf (Opsiyonel)</label>
+                <div className="flex items-center gap-4">
+                  <label className="flex-1 cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-500 py-4 rounded-2xl ring-1 ring-slate-700 ring-dashed border-2 border-transparent hover:border-blue-500/50 flex flex-col items-center justify-center gap-2 transition-all group">
+                    <div className="w-10 h-10 bg-slate-800 rounded-full shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i className="fas fa-camera text-blue-500 text-lg"></i>
+                    </div>
+                    <span className="text-xs font-bold">Fotoğraf Çek / Yükle</span>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      ref={fileInputRef}
+                      onChange={handleImageChange}
+                    />
+                  </label>
+                  {newTaskImage && (
+                    <div className="relative w-24 h-24 rounded-2xl overflow-hidden shadow-lg ring-2 ring-slate-700">
+                      <img src={newTaskImage} alt="Önizleme" className="w-full h-full object-cover" />
+                      <button 
+                        type="button" 
+                        onClick={() => { setNewTaskImage(null); if(fileInputRef.current) fileInputRef.current.value = ''; }}
+                        className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md hover:bg-red-600"
+                      >
+                        <i className="fas fa-times"></i>
+                      </button>
+                    </div>
+                  )}
+                </div>
+            </div>
+
+            <button disabled={loading} className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-blue-900/40 hover:shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
+                {loading ? (
+                    <>
+                    <i className="fas fa-circle-notch animate-spin"></i>
+                    <span>İLETİLİYOR...</span>
+                    </>
+                ) : (
+                    <>
+                    <span>GÖREVİ YAYINLA</span>
+                    <i className="fas fa-paper-plane"></i>
+                    </>
+                )}
+            </button>
+          </form>
         </div>
       )}
 
