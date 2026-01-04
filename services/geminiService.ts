@@ -1,10 +1,8 @@
-
-import { GoogleGenAI, Type } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import { GoogleGenAI } from "@google/genai";
 
 export const generateTaskDescription = async (machineName: string, problem: string): Promise<string> => {
   try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Bir hidrolik birim amiriyim. ${machineName} makinesinde şu sorun var: "${problem}". 
@@ -24,6 +22,7 @@ export const generateTaskDescription = async (machineName: string, problem: stri
 
 export const analyzeTaskCompletion = async (taskDescription: string, masterComment: string): Promise<string> => {
   try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Görev: ${taskDescription}\nUsta Notu: ${masterComment}\n\nBu raporu analiz et ve yapılması gereken ek bir kontrol varsa kısaca belirt.`,
