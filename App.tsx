@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Task, User, TaskStatus, TaskPriority } from './types';
-import { fetchTasks, createNewBin, getStoredBinId, setStoredBinId, safeAddTask, safeUpdateTask, getEmergencyId } from './services/dbService';
+import { fetchTasks, createNewBin, getStoredBinId, setStoredBinId, safeAddTask, safeUpdateTask, getEmergencyId, extractBinId, checkConnection } from './services/dbService';
 import Layout from './components/Layout';
 import TaskCard from './components/TaskCard';
 
@@ -21,9 +21,10 @@ const App: React.FC = () => {
   const [newTaskMaster, setNewTaskMaster] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (forceId?: string) => {
     setLoading(true);
-    const data = await fetchTasks(connectionId);
+    const targetId = forceId || connectionId;
+    const data = await fetchTasks(targetId);
     setTasks(data);
     setLoading(false);
   }, [connectionId]);
@@ -47,7 +48,7 @@ const App: React.FC = () => {
   };
 
   const handleCreateConnection = async () => {
-    if(!confirm("Yeni bir bağlantı kodu oluşturulmaya çalışılacak. Eğer fabrika ağında engellenirse manuel giriş yapmanız istenebilir.")) return;
+    if(!confirm("Otomatik bağlantı oluşturulacak. Devam?")) return;
     
     setLoading(true);
     const newId = await createNewBin();
@@ -55,46 +56,59 @@ const App: React.FC = () => {
     
     if (newId) {
       setConnectionId(newId);
-      alert("✅ BAŞARILI!\n\nOluşturulan Kod: " + newId + "\n\nBu kodu diğer telefonlara girerek eşleşebilirsiniz.");
-      loadData();
+      loadData(newId);
+      alert("✅ BAŞARILI!\n\nKod: " + newId);
     } else {
-      // OTOMATİK OLUŞTURMA BAŞARISIZ OLDU, MANUEL GİRİŞ İSTE
-      const manualCode = prompt(
-        "❌ OTOMATİK OLUŞTURULAMADI (Ağ Engeli)\n\n" +
-        "Lütfen kodu manuel oluşturup buraya girin:\n\n" +
-        "1. Tarayıcıda 'npoint.io' sitesini açın.\n" +
-        "2. '+ Create JSON Bin' butonuna basın.\n" +
-        "3. Adres çubuğundaki kodu kopyalayın (örn: npoint.io/docs/xyz123 -> xyz123).\n" +
-        "4. Kodu buraya yapıştırın:"
+      // MANUEL GİRİŞ
+      const manualInput = prompt(
+        "⚠ OTOMATİK OLUŞTURULAMADI\n\n" +
+        "Lütfen 'npoint.io' sitesinden aldığınız kodu (veya linki) yapıştırın:"
       );
 
-      if (manualCode && manualCode.trim().length > 3) {
-        const cleanCode = manualCode.trim();
-        setStoredBinId(cleanCode);
-        setConnectionId(cleanCode);
-        loadData();
-        alert("Kod kaydedildi! Bağlantı test ediliyor...");
+      if (manualInput && manualInput.trim().length > 1) {
+        setLoading(true);
+        const cleanCode = extractBinId(manualInput);
+        
+        // Önce bağlantıyı test et
+        const isValid = await checkConnection(cleanCode);
+        
+        if (isValid) {
+            setStoredBinId(cleanCode);
+            setConnectionId(cleanCode);
+            await loadData(cleanCode);
+            alert("✅ BAŞARILI! Bağlantı sağlandı.");
+        } else {
+            setLoading(false);
+            alert("❌ BAĞLANTI HATASI!\nGirdiğiniz kod çalışmıyor veya boş. Lütfen npoint.io üzerinde 'Save' yaptığınızdan emin olun.");
+        }
       } else {
-         if(confirm("Kod girilmedi. Demo kanalına bağlanmak ister misiniz?")) {
+         if(confirm("İptal ettiniz. Demo kanalına bağlanılsın mı?")) {
             const emergencyId = getEmergencyId();
             setStoredBinId(emergencyId);
             setConnectionId(emergencyId);
-            loadData();
+            loadData(emergencyId);
          }
       }
     }
   };
 
-  const handleJoinConnection = () => {
-    const code = prompt("Diğer cihazdaki Bağlantı Kodunu girin:");
-    if (code && code.trim().length > 3) {
-      const cleanCode = code.trim();
-      setStoredBinId(cleanCode);
-      setConnectionId(cleanCode);
-      loadData();
-      alert("Bağlantı kodu kaydedildi. Veriler indiriliyor...");
-    } else if (code) {
-      alert("Geçersiz kod.");
+  const handleJoinConnection = async () => {
+    const code = prompt("Bağlantı kodunu girin:");
+    if (code && code.trim().length > 1) {
+      setLoading(true);
+      const cleanCode = extractBinId(code);
+      
+      const isValid = await checkConnection(cleanCode);
+      
+      if (isValid) {
+          setStoredBinId(cleanCode);
+          setConnectionId(cleanCode);
+          await loadData(cleanCode);
+          alert("✅ Veriler indirildi ve eşleşildi.");
+      } else {
+          setLoading(false);
+          alert("❌ Bu kod ile bağlantı kurulamadı.");
+      }
     }
   };
 
@@ -120,7 +134,7 @@ const App: React.FC = () => {
     setNewTaskMachine('');
     setNewTaskDescription('');
     setNewTaskMaster('');
-    alert("Görev başarıyla eklendi.");
+    alert("Görev yayınlandı.");
     setActiveTab('tasks');
   };
 
@@ -185,7 +199,7 @@ const App: React.FC = () => {
       <div className={`px-4 py-3 mb-4 rounded-lg text-xs font-bold flex justify-between items-center shadow-sm ${connectionId ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
         <span className="flex items-center gap-2">
            <i className={`fas ${connectionId ? 'fa-link' : 'fa-wifi-slash'}`}></i>
-           {connectionId ? 'Bağlantı Aktif' : 'Yerel Mod (Senkronizasyon Yok)'}
+           {connectionId ? 'Canlı Bağlantı' : 'Yerel Mod'}
         </span>
         {connectionId && <span className="font-mono bg-white px-2 py-0.5 rounded border border-emerald-200 opacity-80 text-[10px]">{connectionId.substring(0,6)}...</span>}
       </div>
@@ -194,7 +208,7 @@ const App: React.FC = () => {
         <div className="animate-in fade-in duration-500">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-black text-slate-900 tracking-tight">İş Listesi</h2>
-            <button onClick={loadData} disabled={loading} className={`w-10 h-10 rounded-full flex items-center justify-center bg-white border border-slate-200 text-blue-600 shadow-sm ${loading ? 'animate-spin' : ''}`}>
+            <button onClick={() => loadData()} disabled={loading} className={`w-10 h-10 rounded-full flex items-center justify-center bg-white border border-slate-200 text-blue-600 shadow-sm ${loading ? 'animate-spin' : ''}`}>
               <i className="fas fa-sync-alt"></i>
             </button>
           </div>
@@ -222,7 +236,7 @@ const App: React.FC = () => {
             {!connectionId && (
                 <div className="bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl text-xs font-bold flex items-center gap-2">
                     <i className="fas fa-exclamation-triangle"></i>
-                    Uyarı: Bağlantı kodu girmediniz. Veriler sadece bu cihazda kalır.
+                    Veriler sadece bu cihazda kalacak.
                 </div>
             )}
             <div>
@@ -277,15 +291,15 @@ const App: React.FC = () => {
               </div>
               <div className="text-center mt-2">
                  <a href="https://npoint.io" target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 underline">
-                    Kod oluşturamıyorsanız tıklayın: npoint.io
+                    Kod oluşturamıyorsanız buraya tıklayın (npoint.io)
                  </a>
               </div>
            </div>
            <div className="mt-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
               <h3 className="font-bold text-slate-700 mb-2 text-xs uppercase flex items-center gap-2"><i className="fas fa-info-circle"></i> Kullanım Kılavuzu</h3>
               <ul className="text-xs text-slate-600 space-y-2 list-disc pl-4">
-                 <li>Otomatik oluşturma başarısız olursa, <b>npoint.io</b> sitesine gidip <b>Create JSON Bin</b> diyerek çıkan kodu buraya girebilirsiniz.</li>
-                 <li>Kodu tüm cihazlara aynı şekilde girin.</li>
+                 <li>Otomatik bağlantı başarısız olursa, <b>npoint.io</b> üzerinden manuel kod oluşturabilirsiniz.</li>
+                 <li><b>npoint.io</b> linkini direkt yapıştırabilirsiniz, sistem kodu algılar.</li>
               </ul>
            </div>
         </div>

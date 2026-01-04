@@ -26,15 +26,39 @@ export const setStoredBinId = (id: string) => {
   localStorage.setItem(LOCAL_KEY_ID, id.trim());
 };
 
+// Kullanıcının girdiği karmaşık URL'den ID'yi ayıklar
+export const extractBinId = (input: string): string => {
+  let text = input.trim();
+  // URL temizleme
+  if (text.includes('/')) {
+      // Son slash'tan sonrasını al (örn: npoint.io/docs/123 -> 123)
+      const parts = text.split('/');
+      const lastPart = parts[parts.length - 1];
+      if (lastPart) text = lastPart;
+  }
+  return text;
+};
+
 // ID'nin hangi servise ait olduğunu anlar
 const getProviderUrl = (id: string) => {
-  // JsonBlob ID'leri genellikle uzun ve sadece rakamlardan oluşur (örn: 1347...)
-  // Eğer sadece rakamsa ve 15 haneden uzunsa JsonBlob varsayıyoruz.
+  // JsonBlob ID'leri sadece rakam ve uzun
   if (/^\d+$/.test(id) && id.length > 15) {
     return `${PROVIDER_JSONBLOB.api}/${id}`;
   }
-  // Diğer tüm durumlar (kısa, harfli vb) için Npoint varsayıyoruz.
+  // Npoint ID'leri alfanümerik
   return `${PROVIDER_NPOINT.api}/${id}`;
+};
+
+// Sadece bağlantı testi yapar (Veri indirmez)
+export const checkConnection = async (id: string): Promise<boolean> => {
+    if (!id) return false;
+    const url = getProviderUrl(id);
+    try {
+        const response = await fetch(url, { method: 'GET' });
+        return response.ok;
+    } catch {
+        return false;
+    }
 };
 
 // Yeni bir bulut alanı oluşturur (Sırayla dener)
@@ -111,6 +135,7 @@ export const fetchTasks = async (binId?: string): Promise<Task[]> => {
     console.warn("Veri çekme hatası:", e);
   }
   
+  // Hata durumunda local veriyi dön
   const local = localStorage.getItem(LOCAL_KEY_DATA);
   return local ? JSON.parse(local) : [];
 };
