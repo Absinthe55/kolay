@@ -123,6 +123,27 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
   const currentStatus = statusConfig[task.status];
   const currentPriority = priorityConfig[task.priority];
 
+  // Görüldü Bilgisi Render Fonksiyonu
+  const renderSeenStatus = () => {
+    if (user.role !== 'AMIR') return null;
+
+    if (task.seenAt) {
+        return (
+            <span className="text-[10px] font-bold text-blue-400 bg-blue-900/10 px-1.5 py-0.5 rounded flex items-center gap-1 mt-1 border border-blue-900/30 animate-in fade-in">
+                <i className="fas fa-eye text-[9px]"></i> 
+                {formatTime(task.seenAt)}
+            </span>
+        );
+    } else {
+        return (
+            <span className="text-[10px] font-bold text-slate-600 bg-slate-700/20 px-1.5 py-0.5 rounded flex items-center gap-1 mt-1 border border-slate-700/30">
+                <i className="fas fa-eye-slash text-[9px]"></i> 
+                Görülmedi
+            </span>
+        );
+    }
+  };
+
   return (
     <>
       <div className={`bg-slate-800 rounded-[1.25rem] shadow-lg transition-all duration-300 border border-slate-700 overflow-hidden relative ${isCancelled ? 'opacity-60 grayscale-[0.8]' : ''}`}>
@@ -198,12 +219,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                     <span className="text-[10px] font-medium text-slate-500">
                         {new Date(task.createdAt).toLocaleDateString('tr-TR')}
                     </span>
-                    {task.seenAt && user.role === 'AMIR' && (
-                        <span className="text-[10px] font-bold text-blue-400 bg-blue-900/10 px-1.5 py-0.5 rounded flex items-center gap-1 mt-1 border border-blue-900/30">
-                            <i className="fas fa-eye text-[9px]"></i> 
-                            Görüldü: {formatTime(task.seenAt)}
-                        </span>
-                    )}
+                    {renderSeenStatus()}
                   </div>
               </div>
           )}
@@ -263,12 +279,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                             <span className="text-[10px] font-medium text-slate-500">
                                {new Date(task.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
                             </span>
-                            {task.seenAt && user.role === 'AMIR' && (
-                                <span className="text-[9px] font-bold text-blue-400 bg-blue-900/20 px-1.5 py-0.5 rounded ml-1" title="Usta tarafından görüldü">
-                                    <i className="fas fa-eye mr-1"></i>
-                                    {formatTime(task.seenAt)}
-                                </span>
-                            )}
+                            {renderSeenStatus()}
                         </div>
                     </div>
                 </div>
