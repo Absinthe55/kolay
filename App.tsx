@@ -5,21 +5,22 @@ import { fetchTasks, saveTasks } from './services/dbService';
 import Layout from './components/Layout';
 import TaskCard from './components/TaskCard';
 
+// Sabit Personel Listesi
+const AMIR_LIST = ['Birim Amiri Volkan', 'Vardiya Amiri Selçuk'];
+const USTA_LIST = ['Usta Ahmet', 'Usta Mehmet', 'Usta Can', 'Usta Serkan', 'Usta Osman', 'Usta İbrahim'];
+
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [syncError, setSyncError] = useState(false);
   const [activeTab, setActiveTab] = useState<'tasks' | 'add' | 'profile'>('tasks');
-  const [loginInput, setLoginInput] = useState('');
   
   // Form State
   const [newTaskMachine, setNewTaskMachine] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskMaster, setNewTaskMaster] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
-
-  const masters = ['Usta Ahmet', 'Usta Mehmet', 'Usta Can', 'Usta Serkan'];
 
   const refreshData = useCallback(async () => {
     setLoading(true);
@@ -36,16 +37,14 @@ const App: React.FC = () => {
 
   useEffect(() => {
     refreshData();
-    // Arka planda 30 saniyede bir otomatik yenileme
     const interval = setInterval(refreshData, 30000);
     return () => clearInterval(interval);
   }, [refreshData]);
 
-  const handleLogin = (role: 'AMIR' | 'USTA') => {
-    if (!loginInput.trim()) return alert("Lütfen isminizi girin.");
+  const handleLogin = (name: string, role: 'AMIR' | 'USTA') => {
     setCurrentUser({
       id: Math.random().toString(36).substr(2, 9),
-      name: loginInput,
+      name: name,
       role
     });
   };
@@ -67,19 +66,14 @@ const App: React.FC = () => {
     const updatedTasks = [newTask, ...tasks];
     setTasks(updatedTasks);
     
-    // Reset Form ve Liste Ekranına Dön (Hızlı UX)
     setNewTaskMachine('');
     setNewTaskDescription('');
     setNewTaskMaster('');
     setNewTaskPriority(TaskPriority.MEDIUM);
     setActiveTab('tasks');
 
-    // Arka planda kaydet
     const success = await saveTasks(updatedTasks);
-    if (!success) {
-      setSyncError(true);
-      // Not: success false olsa bile dbService yerel hafızaya kaydettiği için veri kaybolmaz.
-    }
+    if (!success) setSyncError(true);
   };
 
   const updateTaskStatus = async (taskId: string, newStatus: TaskStatus, comment?: string) => {
@@ -102,48 +96,58 @@ const App: React.FC = () => {
 
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white">
-        <div className="w-full max-w-sm">
-          <div className="flex flex-col items-center mb-10">
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-start p-6 text-white overflow-y-auto pb-12">
+        <div className="w-full max-w-md">
+          <div className="flex flex-col items-center mt-8 mb-10">
             <div className="bg-blue-600 p-5 rounded-3xl shadow-2xl shadow-blue-900/40 mb-6">
-              <i className="fas fa-oil-can text-5xl"></i>
+              <i className="fas fa-oil-can text-5xl text-white"></i>
             </div>
             <h1 className="text-3xl font-bold tracking-tighter">HidroGörev</h1>
-            <p className="text-slate-400 mt-2 text-center text-sm font-medium">Birim içi görev paylaşım ve takip platformu</p>
+            <p className="text-slate-400 mt-2 text-center text-sm font-medium uppercase tracking-widest">Giriş Yapın</p>
           </div>
 
-          <div className="space-y-6 bg-slate-800/50 p-6 rounded-2xl border border-slate-700 backdrop-blur-sm">
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Kullanıcı Adı</label>
-              <input 
-                type="text" 
-                placeholder="Örn: Ahmet Yılmaz"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                value={loginInput}
-                onChange={(e) => setLoginInput(e.target.value)}
-              />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4 pt-2">
-              <button 
-                onClick={() => handleLogin('AMIR')}
-                className="bg-white text-slate-900 font-bold py-3 px-4 rounded-xl hover:bg-slate-100 transition-all flex flex-col items-center gap-1 active:scale-95"
-              >
-                <i className="fas fa-user-shield text-xl mb-1"></i>
-                Amir Girişi
-              </button>
-              <button 
-                onClick={() => handleLogin('USTA')}
-                className="bg-blue-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-blue-700 transition-all flex flex-col items-center gap-1 active:scale-95 shadow-lg shadow-blue-900/20"
-              >
-                <i className="fas fa-wrench text-xl mb-1"></i>
-                Usta Girişi
-              </button>
-            </div>
+          <div className="space-y-8">
+            {/* AMİR GİRİŞ BÖLÜMÜ */}
+            <section>
+              <h2 className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-4 ml-1 flex items-center gap-2">
+                <i className="fas fa-user-shield"></i> Amir Girişi
+              </h2>
+              <div className="grid grid-cols-1 gap-3">
+                {AMIR_LIST.map(name => (
+                  <button 
+                    key={name}
+                    onClick={() => handleLogin(name, 'AMIR')}
+                    className="bg-slate-800/80 border border-slate-700 p-4 rounded-xl text-left font-bold hover:bg-slate-700 transition-all active:scale-[0.98] flex items-center justify-between"
+                  >
+                    <span>{name}</span>
+                    <i className="fas fa-chevron-right text-slate-500 text-xs"></i>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            {/* USTA GİRİŞ BÖLÜMÜ */}
+            <section>
+              <h2 className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-4 ml-1 flex items-center gap-2">
+                <i className="fas fa-wrench"></i> Usta Girişi
+              </h2>
+              <div className="grid grid-cols-1 gap-3">
+                {USTA_LIST.map(name => (
+                  <button 
+                    key={name}
+                    onClick={() => handleLogin(name, 'USTA')}
+                    className="bg-slate-800/80 border border-slate-700 p-4 rounded-xl text-left font-bold hover:bg-slate-700 transition-all active:scale-[0.98] flex items-center justify-between"
+                  >
+                    <span>{name}</span>
+                    <i className="fas fa-chevron-right text-slate-500 text-xs"></i>
+                  </button>
+                ))}
+              </div>
+            </section>
           </div>
           
-          <p className="text-slate-500 text-[10px] text-center mt-8 uppercase tracking-widest font-bold">
-            Hidrolik Birimi Dijital Dönüşüm Sistemi v1.1
+          <p className="text-slate-500 text-[10px] text-center mt-12 uppercase tracking-widest font-bold opacity-50">
+            Hidrolik Birimi Takip Sistemi v1.2
           </p>
         </div>
       </div>
@@ -238,7 +242,7 @@ const App: React.FC = () => {
                 required
               >
                 <option value="">Usta Seçin...</option>
-                {masters.map(m => <option key={m} value={m}>{m}</option>)}
+                {USTA_LIST.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
 
