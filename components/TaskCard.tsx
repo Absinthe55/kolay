@@ -198,9 +198,10 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                     <span className="text-[10px] font-medium text-slate-500">
                         {new Date(task.createdAt).toLocaleDateString('tr-TR')}
                     </span>
-                    {task.seenAt && user.role === 'AMIR' && (
-                        <span className="text-[9px] font-bold text-blue-400/80 flex items-center gap-1 mt-0.5">
-                            <i className="fas fa-eye"></i> {formatTime(task.seenAt)}
+                    {task.seenAt && (
+                        <span className="text-[10px] font-bold text-blue-400 bg-blue-900/10 px-1.5 py-0.5 rounded flex items-center gap-1 mt-1 border border-blue-900/30">
+                            <i className="fas fa-eye text-[9px]"></i> 
+                            Görüldü: {formatTime(task.seenAt)}
                         </span>
                     )}
                   </div>
@@ -258,7 +259,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                         <p className="text-xs font-bold text-slate-300">
                            {new Date(task.createdAt).toLocaleDateString('tr-TR')}
                         </p>
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between mt-1">
                             <span className="text-[10px] font-medium text-slate-500">
                                {new Date(task.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
                             </span>
