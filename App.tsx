@@ -47,7 +47,7 @@ const App: React.FC = () => {
   };
 
   const handleCreateConnection = async () => {
-    if(!confirm("İnternet üzerinden yeni bir bağlantı kodu oluşturulacak. Devam edilsin mi?")) return;
+    if(!confirm("Yeni bir bağlantı kodu oluşturulmaya çalışılacak. Eğer fabrika ağında engellenirse manuel giriş yapmanız istenebilir.")) return;
     
     setLoading(true);
     const newId = await createNewBin();
@@ -58,20 +58,36 @@ const App: React.FC = () => {
       alert("✅ BAŞARILI!\n\nOluşturulan Kod: " + newId + "\n\nBu kodu diğer telefonlara girerek eşleşebilirsiniz.");
       loadData();
     } else {
-      // Eğer tüm servisler başarısız olursa
-      if(confirm("⚠ Sunuculara erişilemedi (Güvenlik Duvarı/Ağ Hatası).\n\nGenel 'Demo Kanalı'na bağlanmak ister misiniz?")) {
-          const emergencyId = getEmergencyId();
-          setStoredBinId(emergencyId);
-          setConnectionId(emergencyId);
-          alert("Demo kanalına bağlandınız. Kodunuz: " + emergencyId);
-          loadData();
+      // OTOMATİK OLUŞTURMA BAŞARISIZ OLDU, MANUEL GİRİŞ İSTE
+      const manualCode = prompt(
+        "❌ OTOMATİK OLUŞTURULAMADI (Ağ Engeli)\n\n" +
+        "Lütfen kodu manuel oluşturup buraya girin:\n\n" +
+        "1. Tarayıcıda 'npoint.io' sitesini açın.\n" +
+        "2. '+ Create JSON Bin' butonuna basın.\n" +
+        "3. Adres çubuğundaki kodu kopyalayın (örn: npoint.io/docs/xyz123 -> xyz123).\n" +
+        "4. Kodu buraya yapıştırın:"
+      );
+
+      if (manualCode && manualCode.trim().length > 3) {
+        const cleanCode = manualCode.trim();
+        setStoredBinId(cleanCode);
+        setConnectionId(cleanCode);
+        loadData();
+        alert("Kod kaydedildi! Bağlantı test ediliyor...");
+      } else {
+         if(confirm("Kod girilmedi. Demo kanalına bağlanmak ister misiniz?")) {
+            const emergencyId = getEmergencyId();
+            setStoredBinId(emergencyId);
+            setConnectionId(emergencyId);
+            loadData();
+         }
       }
     }
   };
 
   const handleJoinConnection = () => {
     const code = prompt("Diğer cihazdaki Bağlantı Kodunu girin:");
-    if (code && code.trim().length > 5) {
+    if (code && code.trim().length > 3) {
       const cleanCode = code.trim();
       setStoredBinId(cleanCode);
       setConnectionId(cleanCode);
@@ -259,13 +275,17 @@ const App: React.FC = () => {
                     MEVCUT KODU GİR
                  </button>
               </div>
+              <div className="text-center mt-2">
+                 <a href="https://npoint.io" target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 underline">
+                    Kod oluşturamıyorsanız tıklayın: npoint.io
+                 </a>
+              </div>
            </div>
            <div className="mt-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
               <h3 className="font-bold text-slate-700 mb-2 text-xs uppercase flex items-center gap-2"><i className="fas fa-info-circle"></i> Kullanım Kılavuzu</h3>
               <ul className="text-xs text-slate-600 space-y-2 list-disc pl-4">
-                 <li>Sadece <b>BİR</b> telefonda "Yeni Kod Oluştur" deyin.</li>
-                 <li>Çıkan kodu diğer tüm telefonlara "Mevcut Kodu Gir" diyerek yazın.</li>
-                 <li>Bağlantı kurulamazsa "Demo Kanalı" seçeneğini kullanabilirsiniz.</li>
+                 <li>Otomatik oluşturma başarısız olursa, <b>npoint.io</b> sitesine gidip <b>Create JSON Bin</b> diyerek çıkan kodu buraya girebilirsiniz.</li>
+                 <li>Kodu tüm cihazlara aynı şekilde girin.</li>
               </ul>
            </div>
         </div>

@@ -1,23 +1,21 @@
 
 import { Task } from '../types';
 
-// İki farklı sağlayıcı kullanıyoruz. Biri engelliyse diğeri çalışır.
+// İki farklı sağlayıcı kullanıyoruz.
 const PROVIDER_JSONBLOB = {
   name: 'jsonblob',
-  api: 'https://jsonblob.com/api/jsonBlob',
-  idPattern: /^\d+$/ // Sadece rakamlardan oluşur
+  api: 'https://jsonblob.com/api/jsonBlob'
 };
 
 const PROVIDER_NPOINT = {
   name: 'npoint',
-  api: 'https://api.npoint.io',
-  idPattern: /^[a-zA-Z0-9]+$/ // Harf ve rakam karışık
+  api: 'https://api.npoint.io'
 };
 
 const LOCAL_KEY_ID = 'hidro_bin_id';
 const LOCAL_KEY_DATA = 'hidro_data';
 
-// Demo ID (Npoint üzerinden çalışan genel bir test kanalı)
+// Demo ID
 const DEMO_ID = '908d1788734268713503'; 
 
 export const getStoredBinId = () => {
@@ -30,15 +28,18 @@ export const setStoredBinId = (id: string) => {
 
 // ID'nin hangi servise ait olduğunu anlar
 const getProviderUrl = (id: string) => {
-  if (PROVIDER_JSONBLOB.idPattern.test(id) && id.length > 15) {
+  // JsonBlob ID'leri genellikle uzun ve sadece rakamlardan oluşur (örn: 1347...)
+  // Eğer sadece rakamsa ve 15 haneden uzunsa JsonBlob varsayıyoruz.
+  if (/^\d+$/.test(id) && id.length > 15) {
     return `${PROVIDER_JSONBLOB.api}/${id}`;
   }
+  // Diğer tüm durumlar (kısa, harfli vb) için Npoint varsayıyoruz.
   return `${PROVIDER_NPOINT.api}/${id}`;
 };
 
 // Yeni bir bulut alanı oluşturur (Sırayla dener)
 export const createNewBin = async (): Promise<string | null> => {
-  // 1. Önce JsonBlob dene (Daha hızlı ve stabil)
+  // 1. Önce JsonBlob dene
   try {
     const response = await fetch(PROVIDER_JSONBLOB.api, {
       method: 'POST',
@@ -99,7 +100,6 @@ export const fetchTasks = async (binId?: string): Promise<Task[]> => {
     
     if (response.ok) {
       const data = await response.json();
-      // Veri yapısını kontrol et (jsonblob 'tasks' döner, npoint direkt obje dönebilir yapıda)
       const tasks = data.tasks || (Array.isArray(data) ? data : []);
       
       if (Array.isArray(tasks)) {
@@ -123,7 +123,7 @@ export const saveTasks = async (newTasks: Task[], binId?: string): Promise<boole
   if (!id) return true;
 
   const url = getProviderUrl(id);
-  const method = url.includes('jsonblob') ? 'PUT' : 'POST'; // Npoint update için POST kullanabilir
+  const method = url.includes('jsonblob') ? 'PUT' : 'POST'; 
 
   try {
     const response = await fetch(url, {
