@@ -22,6 +22,8 @@ const DEFAULT_USTAS: Member[] = [
 
 // Otomatik bağlanılacak Npoint adresi
 const AUTO_CONNECT_URL = 'https://www.npoint.io/docs/c85115e1d1b4c3276a86';
+// Yerel depolamada yetkilendirme anahtarı
+const LOCAL_KEY_AUTH = 'hidro_auth';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -47,6 +49,7 @@ const App: React.FC = () => {
   const [loginModal, setLoginModal] = useState<{show: boolean, member: Member | null, role: 'AMIR' | 'USTA'} | null>(null);
   const [loginPasswordInput, setLoginPasswordInput] = useState('');
   const [loginError, setLoginError] = useState(false);
+  const [loginRememberMe, setLoginRememberMe] = useState(false);
 
   // Task Form State
   const [newTaskMachine, setNewTaskMachine] = useState('');
@@ -74,12 +77,25 @@ const App: React.FC = () => {
     setLoading(false);
   }, [connectionId]);
 
-  // Otomatik Bağlantı ve Periyodik Güncelleme
+  // Otomatik Bağlantı, Periyodik Güncelleme ve Otomatik Login
   useEffect(() => {
     // 1. İlk açılışta veri yükle
     loadData();
 
-    // 2. Anında otomatik bağlantı kontrolü
+    // 2. Otomatik Login Kontrolü
+    const storedAuth = localStorage.getItem(LOCAL_KEY_AUTH);
+    if (storedAuth) {
+      try {
+        const authUser = JSON.parse(storedAuth);
+        if (authUser && authUser.name && authUser.role) {
+          setCurrentUser(authUser);
+        }
+      } catch (e) {
+        console.error("Auto login error", e);
+      }
+    }
+
+    // 3. Anında otomatik bağlantı kontrolü
     const initAutoConnect = async () => {
        const currentId = getStoredBinId();
        if (!currentId) {
@@ -99,7 +115,7 @@ const App: React.FC = () => {
     };
     initAutoConnect();
 
-    // 3. Periyodik güncelleme
+    // 4. Periyodik güncelleme
     const interval = setInterval(() => {
       if (connectionId) {
         fetchAppData(connectionId).then(data => {
@@ -122,9 +138,10 @@ const App: React.FC = () => {
           setLoginModal({ show: true, member, role });
           setLoginPasswordInput('');
           setLoginError(false);
+          setLoginRememberMe(false);
       } else {
           // Şifre yoksa direkt giriş
-          performLogin(member.name, role);
+          performLogin(member.name, role, false);
       }
   };
 
@@ -133,7 +150,7 @@ const App: React.FC = () => {
       if (!loginModal || !loginModal.member) return;
 
       if (loginPasswordInput === loginModal.member.password) {
-          performLogin(loginModal.member.name, loginModal.role);
+          performLogin(loginModal.member.name, loginModal.role, loginRememberMe);
           setLoginModal(null);
       } else {
           setLoginError(true);
@@ -141,12 +158,22 @@ const App: React.FC = () => {
       }
   };
 
-  const performLogin = (name: string, role: 'AMIR' | 'USTA') => {
-    setCurrentUser({
+  const performLogin = (name: string, role: 'AMIR' | 'USTA', remember: boolean) => {
+    const user: User = {
       id: Math.random().toString(36).substr(2, 9),
       name: name,
       role
-    });
+    };
+    setCurrentUser(user);
+
+    if (remember) {
+      localStorage.setItem(LOCAL_KEY_AUTH, JSON.stringify(user));
+    }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem(LOCAL_KEY_AUTH);
   };
 
   const handleCreateConnection = async () => {
@@ -501,13 +528,24 @@ const App: React.FC = () => {
                             type="password" 
                             autoFocus
                             placeholder="****" 
-                            className={`w-full text-center text-2xl tracking-widest font-bold p-4 rounded-2xl bg-slate-900 border-2 outline-none transition-all mb-2 text-white placeholder:text-slate-600 ${loginError ? 'border-red-500 bg-red-900/20 text-red-200' : 'border-slate-700 focus:border-blue-500'}`}
+                            className={`w-full text-center text-2xl tracking-widest font-bold p-4 rounded-2xl bg-slate-900 border-2 outline-none transition-all mb-4 text-white placeholder:text-slate-600 ${loginError ? 'border-red-500 bg-red-900/20 text-red-200' : 'border-slate-700 focus:border-blue-500'}`}
                             value={loginPasswordInput}
                             onChange={(e) => setLoginPasswordInput(e.target.value)}
                         />
                         {loginError && <p className="text-center text-xs font-bold text-red-400 mb-4 animate-pulse">Hatalı şifre, tekrar deneyin.</p>}
 
-                        <div className="grid grid-cols-2 gap-3 mt-4">
+                        <div className="flex items-center justify-center gap-3 mb-6 bg-slate-900/50 p-2 rounded-xl border border-slate-700/50">
+                            <input 
+                                type="checkbox" 
+                                id="rememberMe" 
+                                className="w-5 h-5 rounded border-slate-600 text-blue-600 focus:ring-blue-500 bg-slate-800 cursor-pointer"
+                                checked={loginRememberMe}
+                                onChange={(e) => setLoginRememberMe(e.target.checked)}
+                            />
+                            <label htmlFor="rememberMe" className="text-sm text-slate-300 font-bold cursor-pointer select-none">Beni Hatırla (Otomatik Giriş)</label>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
                             <button type="button" onClick={() => { setLoginModal(null); setLoginError(false); }} className="py-3 rounded-xl font-bold text-sm text-slate-400 bg-slate-700 hover:bg-slate-600 hover:text-white transition-colors">
                                 Vazgeç
                             </button>
@@ -535,7 +573,7 @@ const App: React.FC = () => {
   const isErkan = currentUser.name === 'Birim Amiri ERKAN ÇİLİNGİR';
 
   return (
-    <Layout user={currentUser} onLogout={() => setCurrentUser(null)} activeTab={activeTab} setActiveTab={setActiveTab}>
+    <Layout user={currentUser} onLogout={handleLogout} activeTab={activeTab} setActiveTab={setActiveTab}>
       <div className={`px-4 py-2 mb-6 rounded-full text-[10px] font-bold flex justify-center items-center shadow-sm mx-auto w-fit transition-colors ${connectionId ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-800/50' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
         <span className="flex items-center gap-1.5">
            <span className={`w-2 h-2 rounded-full ${connectionId ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`}></span>

@@ -183,7 +183,9 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                       </div>
                       <span className="text-xs font-bold text-slate-400">{task.masterName}</span>
                   </div>
-                  <span className="text-[10px] font-medium text-slate-500">{new Date(task.createdAt).toLocaleDateString('tr-TR')}</span>
+                  <span className="text-[10px] font-medium text-slate-500">
+                     {new Date(task.createdAt).toLocaleDateString('tr-TR')}
+                  </span>
               </div>
           )}
         </div>
@@ -235,7 +237,12 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                     <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-400"><i className="far fa-calendar text-xs"></i></div>
                     <div>
                         <p className="text-[9px] text-slate-500 font-bold uppercase">Tarih</p>
-                        <p className="text-xs font-bold text-slate-300">{new Date(task.createdAt).toLocaleDateString('tr-TR')}</p>
+                        <p className="text-xs font-bold text-slate-300">
+                           {new Date(task.createdAt).toLocaleDateString('tr-TR')}
+                        </p>
+                        <p className="text-[10px] font-medium text-slate-500">
+                           {new Date(task.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
                     </div>
                 </div>
             </div>

@@ -22,8 +22,8 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, activeTab, se
                 <i className="fas fa-oil-can text-lg"></i>
             </div>
             <div className="leading-tight">
-                <h1 className="font-black text-slate-100 tracking-tight text-lg">HİDROGÖREV</h1>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Bakım Birimi</p>
+                <h1 className="font-black text-slate-100 tracking-tight text-lg">HİDROLİK</h1>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Birim Takip</p>
             </div>
             </div>
             <div className="flex items-center gap-4">
