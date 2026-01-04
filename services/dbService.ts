@@ -1,4 +1,5 @@
-import { Task } from '../types';
+
+import { Task, Member } from '../types';
 
 // İki farklı sağlayıcı kullanıyoruz.
 const PROVIDER_JSONBLOB = {
@@ -13,15 +14,14 @@ const PROVIDER_NPOINT = {
 
 const LOCAL_KEY_ID = 'hidro_bin_id';
 const LOCAL_KEY_DATA = 'hidro_data';
-const LOCAL_KEY_LISTS = 'hidro_lists';
 
 // Demo ID
 const DEMO_ID = '908d1788734268713503'; 
 
 export interface AppData {
   tasks: Task[];
-  amirs: string[];
-  ustas: string[];
+  amirs: Member[];
+  ustas: Member[];
   updatedAt: number;
 }
 
@@ -68,8 +68,19 @@ export const checkConnection = async (id: string): Promise<boolean> => {
     }
 };
 
+// Yardımcı Fonksiyon: String listesini veya Member listesini normalize et
+const normalizeMembers = (data: any[]): Member[] => {
+    if (!Array.isArray(data)) return [];
+    return data.map(item => {
+        if (typeof item === 'string') {
+            return { name: item, password: '' };
+        }
+        return item; // Zaten Member objesi
+    });
+};
+
 // Yeni bir bulut alanı oluşturur
-export const createNewBin = async (defaultAmirs: string[], defaultUstas: string[]): Promise<string | null> => {
+export const createNewBin = async (defaultAmirs: Member[], defaultUstas: Member[]): Promise<string | null> => {
   const initialData: AppData = {
     tasks: [],
     amirs: defaultAmirs,
@@ -129,10 +140,16 @@ export const fetchAppData = async (binId?: string): Promise<AppData> => {
   if (!id) {
     const localDataStr = localStorage.getItem(LOCAL_KEY_DATA);
     if (localDataStr) {
-       // Eski format kontrolü (sadece array ise)
        const parsed = JSON.parse(localDataStr);
+       // Eğer eski formatsa (tasks array)
        if (Array.isArray(parsed)) return { ...emptyData, tasks: parsed };
-       return { ...emptyData, ...parsed };
+       
+       return { 
+           ...emptyData, 
+           ...parsed,
+           amirs: normalizeMembers(parsed.amirs),
+           ustas: normalizeMembers(parsed.ustas)
+       };
     }
     return emptyData;
   }
@@ -147,19 +164,17 @@ export const fetchAppData = async (binId?: string): Promise<AppData> => {
     
     if (response.ok) {
       const data = await response.json();
-      // Veri formatını normalize et
+      
       let tasks: Task[] = [];
-      let amirs: string[] = [];
-      let ustas: string[] = [];
+      let amirs: Member[] = [];
+      let ustas: Member[] = [];
 
       if (Array.isArray(data)) {
-        // Eski format (sadece task array)
         tasks = data;
       } else {
-        // Yeni format (obje)
         tasks = Array.isArray(data.tasks) ? data.tasks : [];
-        amirs = Array.isArray(data.amirs) ? data.amirs : [];
-        ustas = Array.isArray(data.ustas) ? data.ustas : [];
+        amirs = normalizeMembers(data.amirs);
+        ustas = normalizeMembers(data.ustas);
       }
       
       const normalizedData: AppData = { tasks, amirs, ustas, updatedAt: data.updatedAt || Date.now() };
@@ -176,7 +191,12 @@ export const fetchAppData = async (binId?: string): Promise<AppData> => {
   if (local) {
       const parsed = JSON.parse(local);
       if (Array.isArray(parsed)) return { ...emptyData, tasks: parsed };
-      return { ...emptyData, ...parsed };
+      return { 
+          ...emptyData, 
+          ...parsed,
+          amirs: normalizeMembers(parsed.amirs),
+          ustas: normalizeMembers(parsed.ustas)
+      };
   }
   return emptyData;
 };

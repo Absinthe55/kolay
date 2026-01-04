@@ -1,13 +1,24 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Task, User, TaskStatus, TaskPriority } from './types';
-import { fetchAppData, saveAppData, createNewBin, getStoredBinId, setStoredBinId, getEmergencyId, extractBinId, checkConnection } from './services/dbService';
+import { Task, User, TaskStatus, TaskPriority, Member } from './types';
+import { fetchAppData, saveAppData, createNewBin, getStoredBinId, setStoredBinId, extractBinId, checkConnection } from './services/dbService';
 import Layout from './components/Layout';
 import TaskCard from './components/TaskCard';
 
 // Varsayılan listeler (İlk kurulum veya yerel mod için)
-const DEFAULT_AMIRS = ['Birim Amiri ERKAN ÇİLİNGİR', 'Vardiya Amiri Selçuk', 'Birim Amiri Volkan'];
-const DEFAULT_USTAS = ['Usta Ahmet', 'Usta Mehmet', 'Usta Can', 'Usta Serkan', 'Usta Osman', 'Usta İbrahim'];
+const DEFAULT_AMIRS: Member[] = [
+    { name: 'Birim Amiri ERKAN ÇİLİNGİR' }, 
+    { name: 'Vardiya Amiri Selçuk' }, 
+    { name: 'Birim Amiri Volkan' }
+];
+const DEFAULT_USTAS: Member[] = [
+    { name: 'Usta Ahmet' }, 
+    { name: 'Usta Mehmet' }, 
+    { name: 'Usta Can' }, 
+    { name: 'Usta Serkan' }, 
+    { name: 'Usta Osman' }, 
+    { name: 'Usta İbrahim' }
+];
 
 // Otomatik bağlanılacak Npoint adresi
 const AUTO_CONNECT_URL = 'https://www.npoint.io/docs/c85115e1d1b4c3276a86';
@@ -15,8 +26,8 @@ const AUTO_CONNECT_URL = 'https://www.npoint.io/docs/c85115e1d1b4c3276a86';
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [amirList, setAmirList] = useState<string[]>(DEFAULT_AMIRS);
-  const [ustaList, setUstaList] = useState<string[]>(DEFAULT_USTAS);
+  const [amirList, setAmirList] = useState<Member[]>(DEFAULT_AMIRS);
+  const [ustaList, setUstaList] = useState<Member[]>(DEFAULT_USTAS);
   
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'tasks' | 'add' | 'profile'>('tasks');
@@ -24,7 +35,13 @@ const App: React.FC = () => {
   
   // Personel Yönetimi State'leri
   const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberPassword, setNewMemberPassword] = useState('');
   const [newMemberRole, setNewMemberRole] = useState<'AMIR' | 'USTA'>('USTA');
+
+  // Login State
+  const [loginModal, setLoginModal] = useState<{show: boolean, member: Member | null, role: 'AMIR' | 'USTA'} | null>(null);
+  const [loginPasswordInput, setLoginPasswordInput] = useState('');
+  const [loginError, setLoginError] = useState(false);
 
   // Form State
   const [newTaskMachine, setNewTaskMachine] = useState('');
@@ -88,7 +105,32 @@ const App: React.FC = () => {
     };
   }, [connectionId, loadData]);
 
-  const handleLogin = (name: string, role: 'AMIR' | 'USTA') => {
+  const handleLoginClick = (member: Member, role: 'AMIR' | 'USTA') => {
+      if (member.password && member.password.trim() !== '') {
+          // Şifre varsa modal aç
+          setLoginModal({ show: true, member, role });
+          setLoginPasswordInput('');
+          setLoginError(false);
+      } else {
+          // Şifre yoksa direkt giriş
+          performLogin(member.name, role);
+      }
+  };
+
+  const handleLoginSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!loginModal || !loginModal.member) return;
+
+      if (loginPasswordInput === loginModal.member.password) {
+          performLogin(loginModal.member.name, loginModal.role);
+          setLoginModal(null);
+      } else {
+          setLoginError(true);
+          setLoginPasswordInput('');
+      }
+  };
+
+  const performLogin = (name: string, role: 'AMIR' | 'USTA') => {
     setCurrentUser({
       id: Math.random().toString(36).substr(2, 9),
       name: name,
@@ -157,18 +199,24 @@ const App: React.FC = () => {
     let newAmirs = [...amirList];
     let newUstas = [...ustaList];
 
+    const newMember: Member = {
+        name: newMemberName.trim(),
+        password: newMemberPassword.trim() || undefined
+    };
+
     if (newMemberRole === 'AMIR') {
-        newAmirs.push(newMemberName.trim());
+        newAmirs.push(newMember);
         setAmirList(newAmirs);
     } else {
-        newUstas.push(newMemberName.trim());
+        newUstas.push(newMember);
         setUstaList(newUstas);
     }
 
     await saveAppData({ tasks, amirs: newAmirs, ustas: newUstas }, connectionId);
     setNewMemberName('');
+    setNewMemberPassword('');
     setLoading(false);
-    alert(`${newMemberName} listeye eklendi.`);
+    alert(`${newMember.name} listeye eklendi.`);
   };
 
   const handleRemoveMember = async (name: string, role: 'AMIR' | 'USTA') => {
@@ -179,10 +227,10 @@ const App: React.FC = () => {
       let newUstas = [...ustaList];
 
       if (role === 'AMIR') {
-          newAmirs = newAmirs.filter(a => a !== name);
+          newAmirs = newAmirs.filter(a => a.name !== name);
           setAmirList(newAmirs);
       } else {
-          newUstas = newUstas.filter(u => u !== name);
+          newUstas = newUstas.filter(u => u.name !== name);
           setUstaList(newUstas);
       }
       
@@ -290,7 +338,7 @@ const App: React.FC = () => {
 
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-slate-900 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-6 text-white overflow-y-auto">
+      <div className="min-h-screen bg-slate-900 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-6 text-white overflow-y-auto relative">
         <div className="w-full max-w-sm animate-in zoom-in duration-500">
           <div className="flex flex-col items-center mb-10">
             <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-6 rounded-[2rem] shadow-[0_0_40px_rgba(37,99,235,0.3)] mb-6 ring-4 ring-white/10">
@@ -307,12 +355,13 @@ const App: React.FC = () => {
                  <h2 className="text-xs font-bold text-blue-200 uppercase tracking-widest">Yönetim</h2>
               </div>
               <div className="grid grid-cols-1 gap-2">
-                {amirList.map(name => (
-                  <button key={name} onClick={() => handleLogin(name, 'AMIR')} className="group relative bg-slate-800/50 hover:bg-blue-600 border border-white/5 p-4 rounded-2xl text-left font-bold transition-all duration-300 flex justify-between items-center overflow-hidden">
+                {amirList.map(member => (
+                  <button key={member.name} onClick={() => handleLoginClick(member, 'AMIR')} className="group relative bg-slate-800/50 hover:bg-blue-600 border border-white/5 p-4 rounded-2xl text-left font-bold transition-all duration-300 flex justify-between items-center overflow-hidden">
                     <div className="absolute inset-0 bg-blue-400/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
                     <span className="text-slate-200 group-hover:text-white relative z-10 flex items-center gap-3">
                         <i className="fas fa-user-tie text-blue-400 group-hover:text-white/80"></i>
-                        {name}
+                        {member.name}
+                        {member.password && <i className="fas fa-lock text-[10px] text-slate-500 group-hover:text-white/50"></i>}
                     </span>
                     <i className="fas fa-arrow-right text-slate-600 group-hover:text-white relative z-10 opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0"></i>
                   </button>
@@ -328,12 +377,13 @@ const App: React.FC = () => {
                  <h2 className="text-xs font-bold text-emerald-200 uppercase tracking-widest">Saha Ekibi</h2>
               </div>
               <div className="grid grid-cols-1 gap-2">
-                {ustaList.map(name => (
-                  <button key={name} onClick={() => handleLogin(name, 'USTA')} className="group relative bg-slate-800/50 hover:bg-emerald-600 border border-white/5 p-4 rounded-2xl text-left font-bold transition-all duration-300 flex justify-between items-center overflow-hidden">
+                {ustaList.map(member => (
+                  <button key={member.name} onClick={() => handleLoginClick(member, 'USTA')} className="group relative bg-slate-800/50 hover:bg-emerald-600 border border-white/5 p-4 rounded-2xl text-left font-bold transition-all duration-300 flex justify-between items-center overflow-hidden">
                     <div className="absolute inset-0 bg-emerald-400/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
                     <span className="text-slate-200 group-hover:text-white relative z-10 flex items-center gap-3">
                         <i className="fas fa-wrench text-emerald-400 group-hover:text-white/80"></i>
-                        {name}
+                        {member.name}
+                        {member.password && <i className="fas fa-lock text-[10px] text-slate-500 group-hover:text-white/50"></i>}
                     </span>
                     <i className="fas fa-arrow-right text-slate-600 group-hover:text-white relative z-10 opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0"></i>
                   </button>
@@ -341,8 +391,45 @@ const App: React.FC = () => {
               </div>
             </section>
           </div>
-          <p className="text-center text-[10px] text-slate-600 mt-6 font-mono">v1.2 &bull; Güvenli Bağlantı</p>
+          <p className="text-center text-[10px] text-slate-600 mt-6 font-mono">v1.3 &bull; Güvenli Bağlantı</p>
         </div>
+
+        {/* Login Password Modal */}
+        {loginModal && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                <div className="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl scale-100 animate-in zoom-in-95 duration-200 relative overflow-hidden">
+                     <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+                    <div className="text-center mb-6">
+                        <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner">
+                            <i className="fas fa-lock text-2xl"></i>
+                        </div>
+                        <h3 className="text-lg font-black text-slate-800">Şifre Giriniz</h3>
+                        <p className="text-sm text-slate-500 font-medium">{loginModal.member?.name}</p>
+                    </div>
+
+                    <form onSubmit={handleLoginSubmit}>
+                        <input 
+                            type="password" 
+                            autoFocus
+                            placeholder="****" 
+                            className={`w-full text-center text-2xl tracking-widest font-bold p-4 rounded-2xl bg-slate-50 border-2 outline-none transition-all mb-2 ${loginError ? 'border-red-400 bg-red-50 text-red-600' : 'border-slate-200 focus:border-blue-500 focus:bg-white'}`}
+                            value={loginPasswordInput}
+                            onChange={(e) => setLoginPasswordInput(e.target.value)}
+                        />
+                        {loginError && <p className="text-center text-xs font-bold text-red-500 mb-4 animate-pulse">Hatalı şifre, tekrar deneyin.</p>}
+
+                        <div className="grid grid-cols-2 gap-3 mt-4">
+                            <button type="button" onClick={() => { setLoginModal(null); setLoginError(false); }} className="py-3 rounded-xl font-bold text-sm text-slate-500 bg-slate-100 hover:bg-slate-200">
+                                Vazgeç
+                            </button>
+                            <button type="submit" className="py-3 rounded-xl font-bold text-sm text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200">
+                                Giriş Yap
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        )}
       </div>
     );
   }
@@ -421,7 +508,7 @@ const App: React.FC = () => {
                     <div className="relative">
                         <select className="w-full appearance-none border-0 bg-slate-50 ring-1 ring-slate-200 rounded-2xl p-4 text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all outline-none" value={newTaskMaster} onChange={e => setNewTaskMaster(e.target.value)} required>
                             <option value="">Seçiniz...</option>
-                            {ustaList.map(u => <option key={u} value={u}>{u}</option>)}
+                            {ustaList.map(u => <option key={u.name} value={u.name}>{u.name}</option>)}
                         </select>
                         <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
                     </div>
@@ -504,16 +591,25 @@ const App: React.FC = () => {
                        Personel Yönetimi
                    </h3>
                    
-                   <div className="bg-slate-50 p-4 rounded-2xl mb-6 ring-1 ring-slate-100">
-                       <p className="text-xs font-bold text-slate-400 uppercase mb-3 ml-1">Hızlı Ekle</p>
+                   <div className="bg-slate-50 p-4 rounded-2xl mb-6 ring-1 ring-slate-100 relative z-10">
+                       <p className="text-xs font-bold text-slate-400 uppercase mb-3 ml-1">Yeni Personel Ekle</p>
                        <div className="flex flex-col gap-3">
-                           <input 
-                               type="text" 
-                               placeholder="Ad Soyad" 
-                               className="p-3.5 rounded-xl border-0 bg-white ring-1 ring-slate-200 text-sm w-full font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-                               value={newMemberName}
-                               onChange={(e) => setNewMemberName(e.target.value)}
-                           />
+                           <div className="grid grid-cols-2 gap-3">
+                               <input 
+                                   type="text" 
+                                   placeholder="Ad Soyad" 
+                                   className="p-3.5 rounded-xl border-0 bg-white ring-1 ring-slate-200 text-sm w-full font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                                   value={newMemberName}
+                                   onChange={(e) => setNewMemberName(e.target.value)}
+                               />
+                               <input 
+                                   type="text" 
+                                   placeholder="Şifre (İsteğe Bağlı)" 
+                                   className="p-3.5 rounded-xl border-0 bg-white ring-1 ring-slate-200 text-sm w-full font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                                   value={newMemberPassword}
+                                   onChange={(e) => setNewMemberPassword(e.target.value)}
+                               />
+                           </div>
                            <div className="flex gap-2">
                                <select 
                                    className="p-3.5 rounded-xl border-0 bg-white ring-1 ring-slate-200 text-sm font-bold outline-none"
@@ -537,11 +633,15 @@ const App: React.FC = () => {
                        <div>
                            <h4 className="text-xs font-bold text-blue-500 uppercase mb-3 pl-1">Amir Kadrosu</h4>
                            <ul className="space-y-2">
-                               {amirList.map(name => (
-                                   <li key={name} className="flex justify-between items-center bg-white p-3 rounded-xl ring-1 ring-slate-100 text-xs font-bold text-slate-700 shadow-sm">
-                                       <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-400"></div> {name}</span>
-                                       {name !== currentUser.name && (
-                                           <button onClick={() => handleRemoveMember(name, 'AMIR')} className="w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center">
+                               {amirList.map(member => (
+                                   <li key={member.name} className="flex justify-between items-center bg-white p-3 rounded-xl ring-1 ring-slate-100 text-xs font-bold text-slate-700 shadow-sm">
+                                       <span className="flex items-center gap-2">
+                                           <div className="w-2 h-2 rounded-full bg-blue-400"></div> 
+                                           {member.name}
+                                           {member.password && <i className="fas fa-lock text-slate-300 ml-1" title="Şifreli"></i>}
+                                       </span>
+                                       {member.name !== currentUser.name && (
+                                           <button onClick={() => handleRemoveMember(member.name, 'AMIR')} className="w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center">
                                                <i className="fas fa-trash-alt text-[10px]"></i>
                                            </button>
                                        )}
@@ -552,10 +652,14 @@ const App: React.FC = () => {
                        <div>
                            <h4 className="text-xs font-bold text-emerald-500 uppercase mb-3 pl-1">Usta Kadrosu</h4>
                            <ul className="space-y-2">
-                               {ustaList.map(name => (
-                                   <li key={name} className="flex justify-between items-center bg-white p-3 rounded-xl ring-1 ring-slate-100 text-xs font-bold text-slate-700 shadow-sm">
-                                       <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-400"></div> {name}</span>
-                                       <button onClick={() => handleRemoveMember(name, 'USTA')} className="w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center">
+                               {ustaList.map(member => (
+                                   <li key={member.name} className="flex justify-between items-center bg-white p-3 rounded-xl ring-1 ring-slate-100 text-xs font-bold text-slate-700 shadow-sm">
+                                       <span className="flex items-center gap-2">
+                                           <div className="w-2 h-2 rounded-full bg-emerald-400"></div> 
+                                           {member.name}
+                                           {member.password && <i className="fas fa-lock text-slate-300 ml-1" title="Şifreli"></i>}
+                                       </span>
+                                       <button onClick={() => handleRemoveMember(member.name, 'USTA')} className="w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center">
                                            <i className="fas fa-trash-alt text-[10px]"></i>
                                        </button>
                                    </li>

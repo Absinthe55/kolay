@@ -34,6 +34,11 @@ export interface User {
   role: 'AMIR' | 'USTA';
 }
 
+export interface Member {
+  name: string;
+  password?: string;
+}
+
 export interface AppState {
   tasks: Task[];
   currentUser: User | null;
