@@ -1039,6 +1039,97 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {activeTab === 'add' && currentUser.role === 'AMIR' && (
+        <div className="animate-in slide-in-from-right duration-300 pb-24">
+          <h2 className="text-3xl font-black text-slate-100 tracking-tight mb-6 px-1">Yeni Görev</h2>
+          <form onSubmit={handleCreateTask} className="space-y-5 bg-slate-800 p-6 rounded-[2rem] border border-slate-700 shadow-xl shadow-slate-900/50 relative overflow-hidden">
+             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+            {!connectionId && (
+                <div className="bg-orange-900/20 border border-orange-900/50 text-orange-400 p-4 rounded-xl text-xs font-bold flex items-center gap-3">
+                    <i className="fas fa-wifi-slash text-lg"></i>
+                    Yerel moddasınız. Veriler diğer cihazlara gitmeyebilir.
+                </div>
+            )}
+            <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Makine Adı</label>
+                <input type="text" className="w-full border-0 bg-slate-900 ring-1 ring-slate-700 rounded-2xl p-4 text-slate-100 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-slate-900 transition-all outline-none placeholder:font-normal placeholder:text-slate-600" value={newTaskMachine} onChange={e => setNewTaskMachine(e.target.value)} required placeholder="Örn: Enjeksiyon 3" />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Görevli Usta</label>
+                    <div className="relative">
+                        <select className="w-full appearance-none border-0 bg-slate-900 ring-1 ring-slate-700 rounded-2xl p-4 text-slate-100 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-slate-900 transition-all outline-none" value={newTaskMaster} onChange={e => setNewTaskMaster(e.target.value)} required>
+                            <option value="">Seçiniz...</option>
+                            {ustaList.map(u => <option key={u.name} value={u.name}>{u.name}</option>)}
+                        </select>
+                        <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"></i>
+                    </div>
+                </div>
+                 <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Öncelik</label>
+                    <div className="relative">
+                        <select className="w-full appearance-none border-0 bg-slate-900 ring-1 ring-slate-700 rounded-2xl p-4 text-slate-100 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-slate-900 transition-all outline-none" value={newTaskPriority} onChange={e => setNewTaskPriority(e.target.value as TaskPriority)}>
+                             {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                         <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">İş Emri Detayı</label>
+                <textarea className="w-full border-0 bg-slate-900 ring-1 ring-slate-700 rounded-2xl p-4 text-slate-100 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:bg-slate-900 transition-all outline-none min-h-[120px] resize-none placeholder:text-slate-600" value={newTaskDescription} onChange={e => setNewTaskDescription(e.target.value)} required placeholder="Yapılacak işlemi detaylıca tarif ediniz..." />
+            </div>
+            
+            <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Fotoğraf (Opsiyonel)</label>
+                <div className="flex items-center gap-4">
+                  <label className="flex-1 cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-500 py-4 rounded-2xl ring-1 ring-slate-700 ring-dashed border-2 border-transparent hover:border-blue-500/50 flex flex-col items-center justify-center gap-2 transition-all group">
+                    <div className="w-10 h-10 bg-slate-800 rounded-full shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i className="fas fa-camera text-blue-500 text-lg"></i>
+                    </div>
+                    <span className="text-xs font-bold">Fotoğraf Çek / Yükle</span>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      ref={fileInputRef}
+                      onChange={handleImageChange}
+                    />
+                  </label>
+                  {newTaskImage && (
+                    <div className="relative w-24 h-24 rounded-2xl overflow-hidden shadow-lg ring-2 ring-slate-700">
+                      <img src={newTaskImage} alt="Önizleme" className="w-full h-full object-cover" />
+                      <button 
+                        type="button" 
+                        onClick={() => { setNewTaskImage(null); if(fileInputRef.current) fileInputRef.current.value = ''; }}
+                        className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md hover:bg-red-600"
+                      >
+                        <i className="fas fa-times"></i>
+                      </button>
+                    </div>
+                  )}
+                </div>
+            </div>
+
+            <button disabled={loading} className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-blue-900/40 hover:shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
+                {loading ? (
+                    <>
+                    <i className="fas fa-circle-notch animate-spin"></i>
+                    <span>İLETİLİYOR...</span>
+                    </>
+                ) : (
+                    <>
+                    <span>GÖREVİ YAYINLA</span>
+                    <i className="fas fa-paper-plane"></i>
+                    </>
+                )}
+            </button>
+          </form>
+        </div>
+      )}
+
       {/* Şifre Değiştirme Modalı */}
       {passwordChangeModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
