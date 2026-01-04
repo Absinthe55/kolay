@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Task, User, TaskStatus, TaskPriority } from './types';
-import { fetchTasks, saveTasks } from './services/dbService';
+import { fetchTasks, saveTasks, getSyncKey, setSyncKey } from './services/dbService';
 import Layout from './components/Layout';
 import TaskCard from './components/TaskCard';
 
@@ -12,35 +12,35 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
-  const [syncError, setSyncError] = useState(false);
-  const [lastSyncTime, setLastSyncTime] = useState<string>('');
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
   const [activeTab, setActiveTab] = useState<'tasks' | 'add' | 'profile'>('tasks');
+  const [unitCode, setUnitCode] = useState(getSyncKey());
   
   const [newTaskMachine, setNewTaskMachine] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskMaster, setNewTaskMaster] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
 
-  const refreshData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    setSyncStatus('syncing');
     try {
       const data = await fetchTasks();
       setTasks(data);
-      setSyncError(false);
-      setLastSyncTime(new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      setSyncStatus('synced');
     } catch (err) {
-      setSyncError(true);
+      setSyncStatus('error');
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    refreshData();
-    // Diğer cihazlardaki değişiklikleri görmek için her 10 saniyede bir kontrol et
-    const interval = setInterval(refreshData, 10000);
+    loadData();
+    // Diğer telefonlardaki değişimleri yakalamak için 5 saniyede bir kontrol (Agresif sync)
+    const interval = setInterval(() => loadData(false), 5000);
     return () => clearInterval(interval);
-  }, [refreshData]);
+  }, [loadData]);
 
   const handleLogin = (name: string, role: 'AMIR' | 'USTA') => {
     setCurrentUser({
@@ -52,7 +52,7 @@ const App: React.FC = () => {
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTaskMachine || !newTaskDescription || !newTaskMaster) return alert("Lütfen tüm alanları doldurun.");
+    if (!newTaskMachine || !newTaskDescription || !newTaskMaster) return alert("Eksik bilgi!");
 
     const newTask: Task = {
       id: Date.now().toString(),
@@ -66,19 +66,16 @@ const App: React.FC = () => {
 
     const updatedTasks = [newTask, ...tasks];
     setTasks(updatedTasks);
+    setActiveTab('tasks');
     
+    setSyncStatus('syncing');
+    const success = await saveTasks(updatedTasks);
+    setSyncStatus(success ? 'synced' : 'error');
+
+    // Formu temizle
     setNewTaskMachine('');
     setNewTaskDescription('');
     setNewTaskMaster('');
-    setNewTaskPriority(TaskPriority.MEDIUM);
-    setActiveTab('tasks');
-
-    const success = await saveTasks(updatedTasks);
-    if (!success) {
-      setSyncError(true);
-    } else {
-      setLastSyncTime(new Date().toLocaleTimeString('tr-TR'));
-    }
   };
 
   const updateTaskStatus = async (taskId: string, newStatus: TaskStatus, comment?: string) => {
@@ -95,9 +92,19 @@ const App: React.FC = () => {
     });
 
     setTasks(updatedTasks);
+    setSyncStatus('syncing');
     const success = await saveTasks(updatedTasks);
-    if (!success) setSyncError(true);
-    else setLastSyncTime(new Date().toLocaleTimeString('tr-TR'));
+    setSyncStatus(success ? 'synced' : 'error');
+  };
+
+  const updateUnitCode = () => {
+    const newCode = prompt("Birim Kodunu Girin (Diğer telefonlarla aynı olmalı):", unitCode);
+    if (newCode && newCode.trim()) {
+      setSyncKey(newCode);
+      setUnitCode(newCode);
+      loadData();
+      alert("Birim kodu güncellendi. Veriler bu kod altındaki odadan çekilecek.");
+    }
   };
 
   if (!currentUser) {
@@ -109,21 +116,17 @@ const App: React.FC = () => {
               <i className="fas fa-oil-can text-5xl text-white"></i>
             </div>
             <h1 className="text-3xl font-bold tracking-tighter">HidroGörev</h1>
-            <p className="text-slate-400 mt-2 text-center text-sm font-medium uppercase tracking-widest">Giriş Yapın</p>
+            <p className="text-slate-400 mt-2 text-center text-sm font-medium">Birim İçi Eşzamanlı Takip</p>
           </div>
 
           <div className="space-y-8">
             <section>
-              <h2 className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-4 ml-1 flex items-center gap-2">
-                <i className="fas fa-user-shield"></i> Amir Girişi
+              <h2 className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <i className="fas fa-user-shield"></i> Amir Listesi
               </h2>
               <div className="grid grid-cols-1 gap-3">
                 {AMIR_LIST.map(name => (
-                  <button 
-                    key={name}
-                    onClick={() => handleLogin(name, 'AMIR')}
-                    className="bg-slate-800/80 border border-slate-700 p-4 rounded-xl text-left font-bold hover:bg-slate-700 transition-all active:scale-[0.98] flex items-center justify-between"
-                  >
+                  <button key={name} onClick={() => handleLogin(name, 'AMIR')} className="bg-slate-800/80 border border-slate-700 p-4 rounded-xl text-left font-bold active:scale-95 flex items-center justify-between">
                     <span>{name}</span>
                     <i className="fas fa-chevron-right text-slate-500 text-xs"></i>
                   </button>
@@ -132,16 +135,12 @@ const App: React.FC = () => {
             </section>
 
             <section>
-              <h2 className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-4 ml-1 flex items-center gap-2">
-                <i className="fas fa-wrench"></i> Usta Girişi
+              <h2 className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <i className="fas fa-wrench"></i> Usta Listesi
               </h2>
               <div className="grid grid-cols-1 gap-3">
                 {USTA_LIST.map(name => (
-                  <button 
-                    key={name}
-                    onClick={() => handleLogin(name, 'USTA')}
-                    className="bg-slate-800/80 border border-slate-700 p-4 rounded-xl text-left font-bold hover:bg-slate-700 transition-all active:scale-[0.98] flex items-center justify-between"
-                  >
+                  <button key={name} onClick={() => handleLogin(name, 'USTA')} className="bg-slate-800/80 border border-slate-700 p-4 rounded-xl text-left font-bold active:scale-95 flex items-center justify-between">
                     <span>{name}</span>
                     <i className="fas fa-chevron-right text-slate-500 text-xs"></i>
                   </button>
@@ -149,10 +148,6 @@ const App: React.FC = () => {
               </div>
             </section>
           </div>
-          
-          <p className="text-slate-500 text-[10px] text-center mt-12 uppercase tracking-widest font-bold opacity-50">
-            Hidrolik Birimi Takip Sistemi v1.3
-          </p>
         </div>
       </div>
     );
@@ -163,59 +158,39 @@ const App: React.FC = () => {
     : tasks;
 
   return (
-    <Layout 
-      user={currentUser} 
-      onLogout={() => setCurrentUser(null)} 
-      activeTab={activeTab} 
-      setActiveTab={setActiveTab}
-    >
+    <Layout user={currentUser} onLogout={() => setCurrentUser(null)} activeTab={activeTab} setActiveTab={setActiveTab}>
+      <div className="sticky top-[72px] z-40 -mx-4 mb-4 px-4">
+         <div className={`flex items-center justify-between px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-tighter shadow-sm border ${
+           syncStatus === 'synced' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+           syncStatus === 'syncing' ? 'bg-blue-50 text-blue-700 border-blue-100 animate-pulse' :
+           'bg-red-50 text-red-700 border-red-100'
+         }`}>
+            <span className="flex items-center gap-2">
+               <i className={`fas ${syncStatus === 'synced' ? 'fa-check-circle' : syncStatus === 'syncing' ? 'fa-sync animate-spin' : 'fa-exclamation-triangle'}`}></i>
+               {syncStatus === 'synced' ? 'Bulut ile Eşitlendi' : syncStatus === 'syncing' ? 'Veriler Güncelleniyor...' : 'Bağlantı Hatası!'}
+            </span>
+            <span className="opacity-60">Kod: {unitCode}</span>
+         </div>
+      </div>
+
       {activeTab === 'tasks' && (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">Görevler</h2>
-              <div className="flex flex-col gap-1 mt-1">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">
-                  <i className="fas fa-clock mr-1"></i> Son Güncelleme: {lastSyncTime || '...'}
-                </p>
-                {syncError && (
-                  <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md font-bold w-fit">
-                    <i className="fas fa-cloud-slash mr-1"></i> SENKRONİZASYON BEKLİYOR
-                  </span>
-                )}
-              </div>
-            </div>
-            <button 
-              onClick={refreshData} 
-              disabled={loading}
-              className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-blue-600 transition-colors shadow-sm active:rotate-180 duration-500"
-            >
+        <div className="animate-in fade-in duration-500">
+          <div className="flex justify-between items-end mb-6">
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Aktif İşler</h2>
+            <button onClick={() => loadData()} disabled={loading} className="p-2 text-blue-600 active:rotate-180 transition-transform duration-500">
               <i className={`fas fa-sync-alt ${loading ? 'animate-spin' : ''}`}></i>
             </button>
           </div>
 
           {filteredTasks.length === 0 ? (
-            <div className="py-20 flex flex-col items-center justify-center text-slate-400">
-              <i className="fas fa-clipboard-check text-5xl mb-4 opacity-20"></i>
-              <p className="text-sm font-medium">Şu an aktif görev bulunmuyor.</p>
-              {currentUser.role === 'AMIR' && (
-                <button 
-                  onClick={() => setActiveTab('add')}
-                  className="mt-4 text-blue-600 font-bold text-sm"
-                >
-                  + İlk Görevi Ata
-                </button>
-              )}
+            <div className="py-20 text-center text-slate-400">
+              <i className="fas fa-check-double text-4xl mb-3 opacity-20"></i>
+              <p className="text-sm font-medium">Bekleyen görev bulunmuyor.</p>
             </div>
           ) : (
-            <div className="pb-4">
+            <div className="pb-4 space-y-4">
               {filteredTasks.map(task => (
-                <TaskCard 
-                  key={task.id} 
-                  task={task} 
-                  user={currentUser} 
-                  onUpdateStatus={updateTaskStatus} 
-                />
+                <TaskCard key={task.id} task={task} user={currentUser} onUpdateStatus={updateTaskStatus} />
               ))}
             </div>
           )}
@@ -223,72 +198,33 @@ const App: React.FC = () => {
       )}
 
       {activeTab === 'add' && currentUser.role === 'AMIR' && (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-6">Yeni Görev Atama</h2>
-          
-          <form onSubmit={handleCreateTask} className="space-y-5 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Makine / Ekipman</label>
-              <input 
-                type="text" 
-                placeholder="Örn: 2000 Tonluk Pres"
-                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
-                value={newTaskMachine}
-                onChange={(e) => setNewTaskMachine(e.target.value)}
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Usta Seçimi</label>
-              <select 
-                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 appearance-none"
-                value={newTaskMaster}
-                onChange={(e) => setNewTaskMaster(e.target.value)}
-                required
-              >
-                <option value="">Usta Seçin...</option>
-                {USTA_LIST.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Öncelik</label>
-              <div className="grid grid-cols-2 gap-2">
-                {Object.values(TaskPriority).map(p => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setNewTaskPriority(p)}
-                    className={`py-2 px-3 rounded-lg text-xs font-bold transition-all border ${
-                      newTaskPriority === p 
-                        ? 'bg-blue-600 text-white border-blue-600' 
-                        : 'bg-white text-slate-600 border-slate-200'
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Görev Detayı</label>
-              <textarea 
-                placeholder="Lütfen yapılacak işlemi detaylandırın..."
-                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
-                rows={5}
-                value={newTaskDescription}
-                onChange={(e) => setNewTaskDescription(e.target.value)}
-                required
-              />
-            </div>
-
-            <button 
-              type="submit" 
-              className="w-full py-4 rounded-xl font-bold text-white shadow-xl shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2 bg-blue-600"
+        <div className="animate-in slide-in-from-right duration-300">
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-6">Görev Atama</h2>
+          <form onSubmit={handleCreateTask} className="space-y-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <input 
+              type="text" placeholder="Makine Adı" 
+              className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500"
+              value={newTaskMachine} onChange={(e) => setNewTaskMachine(e.target.value)} required
+            />
+            <select 
+              className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-slate-50 outline-none appearance-none"
+              value={newTaskMaster} onChange={(e) => setNewTaskMaster(e.target.value)} required
             >
-              <i className="fas fa-paper-plane"></i>
+              <option value="">Usta Seçin</option>
+              {USTA_LIST.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <div className="grid grid-cols-2 gap-2">
+              {Object.values(TaskPriority).map(p => (
+                <button key={p} type="button" onClick={() => setNewTaskPriority(p)} className={`py-2 rounded-lg text-xs font-bold border transition-all ${newTaskPriority === p ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-slate-600 border-slate-200'}`}>
+                  {p}
+                </button>
+              ))}
+            </div>
+            <textarea 
+              placeholder="İşlem Detayı..." className="w-full border border-slate-200 rounded-xl px-4 py-3 bg-slate-50 outline-none h-32"
+              value={newTaskDescription} onChange={(e) => setNewTaskDescription(e.target.value)} required
+            />
+            <button type="submit" className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg active:scale-95 transition-transform">
               GÖREVİ GÖNDER
             </button>
           </form>
@@ -296,41 +232,24 @@ const App: React.FC = () => {
       )}
 
       {activeTab === 'profile' && (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-6">Profil ve Ayarlar</h2>
-          
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
-            <div className="p-6 flex items-center gap-4 border-b border-slate-100">
-              <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                {currentUser.name.charAt(0)}
+        <div className="animate-in slide-in-from-left duration-300">
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-6">Ayarlar</h2>
+          <div className="space-y-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Birim Senkronizasyon Kodu</label>
+              <div className="flex gap-2">
+                <div className="flex-1 bg-slate-100 px-4 py-3 rounded-xl font-mono text-sm font-bold border border-slate-200 truncate">
+                  {unitCode}
+                </div>
+                <button onClick={updateUnitCode} className="bg-blue-600 text-white px-4 rounded-xl font-bold text-xs">Değiştir</button>
               </div>
-              <div>
-                <h3 className="font-bold text-lg">{currentUser.name}</h3>
-                <p className="text-sm text-slate-500">{currentUser.role === 'AMIR' ? 'Birim Amiri' : 'Usta - Bakım Ekibi'}</p>
-              </div>
+              <p className="mt-3 text-[10px] text-slate-500 leading-tight">
+                * Bu kodun diğer telefonlarda da aynı olduğundan emin olun. Kod farklıysa görevleri göremezsiniz.
+              </p>
             </div>
-          </div>
 
-          <div className="space-y-3">
-             <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 text-emerald-800 text-sm">
-                <i className="fas fa-shield-check mr-2"></i>
-                Cihazlar arası senkronizasyon her 10 saniyede bir otomatik gerçekleşir.
-             </div>
-
-            <button 
-              onClick={() => {
-                if(confirm("TÜM GÖREV GEÇMİŞİ SİLİNECEK. Emin misiniz?")) {
-                  saveTasks([]);
-                  setTasks([]);
-                  alert("Tüm veriler temizlendi.");
-                }
-              }}
-              className="w-full bg-red-50 p-4 rounded-xl border border-red-100 flex items-center justify-between font-bold text-red-600 hover:bg-red-100 transition-colors mt-6"
-            >
-              <div className="flex items-center gap-3">
-                <i className="fas fa-trash-can"></i>
-                Verileri Sıfırla
-              </div>
+            <button onClick={() => { if(confirm("Tüm veriler silinsin mi?")) { saveTasks([]); setTasks([]); } }} className="w-full bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 font-bold text-sm flex items-center gap-2 justify-center">
+              <i className="fas fa-trash"></i> Veriyi Temizle
             </button>
           </div>
         </div>

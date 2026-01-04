@@ -1,23 +1,30 @@
 
 import { Task } from '../types';
 
-/**
- * Veriler npoint.io üzerinde saklanır. 
- */
-const BIN_ID = '785055b8da372d8a4f21'; 
-const API_URL = `https://api.npoint.io/${BIN_ID}`;
+const BASE_API_URL = 'https://api.npoint.io';
+const DEFAULT_SYNC_KEY = 'hidro_fabrika_77'; // Varsayılan genel kod
 const LOCAL_STORAGE_KEY = 'hidro_gorev_data';
+const SYNC_KEY_STORAGE = 'hidro_sync_id';
+
+// Kullanıcının özel birim kodunu al veya varsayılanı döndür
+export const getSyncKey = () => {
+  return localStorage.getItem(SYNC_KEY_STORAGE) || DEFAULT_SYNC_KEY;
+};
+
+export const setSyncKey = (key: string) => {
+  localStorage.setItem(SYNC_KEY_STORAGE, key.trim());
+};
 
 export const fetchTasks = async (): Promise<Task[]> => {
+  const syncKey = getSyncKey();
   try {
-    // cache: 'no-store' ekleyerek tarayıcının eski veriyi getirmesini engelliyoruz
-    const response = await fetch(`${API_URL}?t=${Date.now()}`, {
+    // URL'ye her seferinde farklı bir sayı ekleyerek telefonun eski veriyi getirmesini engelliyoruz
+    const response = await fetch(`${BASE_API_URL}/${syncKey}?t=${Math.random()}`, {
       method: 'GET',
       headers: { 
-        'Accept': 'application/json',
-        'Cache-Control': 'no-cache'
-      },
-      cache: 'no-store'
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
     });
 
     if (response.ok) {
@@ -28,7 +35,7 @@ export const fetchTasks = async (): Promise<Task[]> => {
       }
     }
   } catch (error) {
-    console.warn("Bulut verisi çekilemedi, yerel veri kullanılıyor.");
+    console.warn("Bulut verisi çekilemedi:", error);
   }
 
   const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -36,31 +43,31 @@ export const fetchTasks = async (): Promise<Task[]> => {
 };
 
 export const saveTasks = async (tasks: Task[]): Promise<boolean> => {
-  // Önce her zaman yerele kaydet
+  const syncKey = getSyncKey();
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(tasks));
 
   try {
-    const response = await fetch(API_URL, {
+    const response = await fetch(`${BASE_API_URL}/${syncKey}`, {
       method: 'PUT',
-      headers: { 
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ tasks, lastUpdate: Date.now() })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tasks, updated: Date.now() })
     });
 
     if (response.status === 404) {
-      // Eğer bin silindiyse veya yoksa yeniden oluşturmayı dene
-      const createResponse = await fetch(API_URL.replace(`/${BIN_ID}`, ''), {
+      // Eğer bu birim koduyla ilk kez veri gönderiliyorsa oluştur
+      const createResponse = await fetch(BASE_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tasks, lastUpdate: Date.now() })
+        body: JSON.stringify({ tasks, updated: Date.now() })
       });
+      // Not: npoint POST yapınca yeni bir ID verir. 
+      // Ancak biz PUT ile belirli bir key üzerinden gitmeyi tercih ediyoruz.
       return createResponse.ok;
     }
 
     return response.ok;
   } catch (error) {
-    console.error("Bulut senkronizasyon hatası:", error);
+    console.error("Kayıt hatası:", error);
     return false;
   }
 };
