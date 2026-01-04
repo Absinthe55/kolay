@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Task, TaskStatus, TaskPriority, User } from '../types';
 
@@ -5,9 +6,10 @@ interface TaskCardProps {
   task: Task;
   user: User;
   onUpdateStatus: (taskId: string, newStatus: TaskStatus, comment?: string, completedImage?: string) => void;
+  onDelete?: (taskId: string) => void;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelete }) => {
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [comment, setComment] = useState('');
   const [completedImage, setCompletedImage] = useState<string | null>(null);
@@ -62,6 +64,11 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus }) => {
     if (confirm('Bu görevi iptal etmek istediğinize emin misiniz?')) {
       onUpdateStatus(task.id, TaskStatus.CANCELLED, 'Yönetici tarafından iptal edildi.');
     }
+  };
+
+  const handleDeleteTask = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDelete) onDelete(task.id);
   };
 
   // Tamamlama Resmi İşleme
@@ -141,20 +148,36 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus }) => {
             </div>
           </div>
 
-          <div className="flex flex-col items-end gap-1 min-w-[60px]">
+          <div className="flex flex-col items-end gap-1 min-w-[70px]">
               <div className={`text-xs flex items-center gap-1 ${priorityColors[task.priority]}`}>
                   <i className="fas fa-circle text-[8px]"></i>
                   {task.priority}
               </div>
-              {/* İPTAL BUTONU - ARTIK HER ZAMAN GÖRÜNÜR (AMIR İÇİN) */}
-              {user.role === 'AMIR' && !isCancelled && task.status !== TaskStatus.COMPLETED && (
-                  <button 
-                      onClick={handleCancelTask}
-                      className="text-[10px] text-red-500 font-bold border border-red-200 px-2 py-0.5 rounded bg-red-50 hover:bg-red-100 transition-colors mt-1 flex items-center gap-1"
-                  >
-                      <i className="fas fa-trash-alt"></i> İPTAL
-                  </button>
-              )}
+              
+              <div className="flex items-center gap-1 mt-1">
+                 {/* SİLME BUTONU - HER ZAMAN GÖRÜNÜR (AMIR İÇİN) */}
+                 {user.role === 'AMIR' && onDelete && (
+                      <button 
+                          onClick={handleDeleteTask}
+                          className="w-6 h-6 flex items-center justify-center rounded bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors shadow-sm"
+                          title="Görevi Tamamen Sil"
+                      >
+                          <i className="fas fa-trash-alt text-[10px]"></i>
+                      </button>
+                 )}
+
+                 {/* İPTAL BUTONU (Sadece Aktif Görevler İçin) */}
+                 {user.role === 'AMIR' && !isCancelled && task.status !== TaskStatus.COMPLETED && (
+                      <button 
+                          onClick={handleCancelTask}
+                          className="text-[10px] text-red-500 font-bold border border-red-200 px-2 py-0.5 rounded bg-red-50 hover:bg-red-100 transition-colors h-6 flex items-center"
+                          title="Görevi İptal Et"
+                      >
+                          İPTAL
+                      </button>
+                 )}
+              </div>
+
               {isCollapsed && task.completedAt && (
                   <span className="text-[10px] text-slate-400 font-mono">{formatTime(task.completedAt)}</span>
               )}

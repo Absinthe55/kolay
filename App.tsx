@@ -287,6 +287,17 @@ const App: React.FC = () => {
     setLoading(false);
   };
 
+  // Görev Silme Fonksiyonu
+  const handleDeleteTask = async (taskId: string) => {
+    if (!confirm("BU GÖREV KALICI OLARAK SİLİNECEK.\n\nEmin misiniz?")) return;
+
+    setLoading(true);
+    const updatedTasks = tasks.filter(t => t.id !== taskId);
+    setTasks(updatedTasks);
+    await saveAppData({ tasks: updatedTasks, amirs: amirList, ustas: ustaList }, connectionId);
+    setLoading(false);
+  };
+
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-start p-6 text-white overflow-y-auto pb-12">
@@ -361,7 +372,13 @@ const App: React.FC = () => {
           ) : (
             <div className="space-y-4 pb-20">
               {filteredTasks.map(task => (
-                <TaskCard key={task.id} task={task} user={currentUser} onUpdateStatus={updateTaskStatus} />
+                <TaskCard 
+                  key={task.id} 
+                  task={task} 
+                  user={currentUser} 
+                  onUpdateStatus={updateTaskStatus}
+                  onDelete={handleDeleteTask}
+                />
               ))}
             </div>
           )}
