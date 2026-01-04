@@ -28,11 +28,9 @@ const App: React.FC = () => {
     setLoading(false);
   }, [connectionId]);
 
-  // İlk yükleme ve periyodik kontrol
   useEffect(() => {
     loadData();
     const interval = setInterval(() => {
-      // Arka planda sessizce güncelle (eğer bağlantı varsa)
       if (connectionId) {
         fetchTasks(connectionId).then(setTasks);
       }
@@ -49,7 +47,7 @@ const App: React.FC = () => {
   };
 
   const handleCreateConnection = async () => {
-    if(!confirm("Yeni bir bağlantı oluşturulacak. Bu işlem internet bağlantısı gerektirir.")) return;
+    if(!confirm("İnternet üzerinden yeni bir bağlantı kodu oluşturulacak. Devam edilsin mi?")) return;
     
     setLoading(true);
     const newId = await createNewBin();
@@ -60,27 +58,27 @@ const App: React.FC = () => {
       alert("✅ BAŞARILI!\n\nOluşturulan Kod: " + newId + "\n\nBu kodu diğer telefonlara girerek eşleşebilirsiniz.");
       loadData();
     } else {
-      // Hata durumunda alternatif sun
-      if(confirm("⚠ Bağlantı otomatik oluşturulamadı (Güvenlik duvarı veya ağ hatası).\n\nHazır 'Yedek Kanal' kullanılsın mı?")) {
+      // Eğer tüm servisler başarısız olursa
+      if(confirm("⚠ Sunuculara erişilemedi (Güvenlik Duvarı/Ağ Hatası).\n\nGenel 'Demo Kanalı'na bağlanmak ister misiniz?")) {
           const emergencyId = getEmergencyId();
           setStoredBinId(emergencyId);
           setConnectionId(emergencyId);
-          alert("Yedek kanala bağlandınız. Kodunuz: " + emergencyId);
+          alert("Demo kanalına bağlandınız. Kodunuz: " + emergencyId);
           loadData();
       }
     }
   };
 
   const handleJoinConnection = () => {
-    const code = prompt("Diğer telefondaki Bağlantı Kodunu girin:");
+    const code = prompt("Diğer cihazdaki Bağlantı Kodunu girin:");
     if (code && code.trim().length > 5) {
       const cleanCode = code.trim();
       setStoredBinId(cleanCode);
       setConnectionId(cleanCode);
       loadData();
-      alert("Bağlantı ayarlandı. Veriler kontrol ediliyor...");
+      alert("Bağlantı kodu kaydedildi. Veriler indiriliyor...");
     } else if (code) {
-      alert("Geçersiz veya çok kısa kod.");
+      alert("Geçersiz kod.");
     }
   };
 
@@ -99,7 +97,6 @@ const App: React.FC = () => {
     };
 
     setLoading(true);
-    // Güvenli ekleme metodu kullanıyoruz
     const updatedList = await safeAddTask(newTask);
     setTasks(updatedList);
     setLoading(false);
@@ -107,7 +104,7 @@ const App: React.FC = () => {
     setNewTaskMachine('');
     setNewTaskDescription('');
     setNewTaskMaster('');
-    alert("Görev oluşturuldu!");
+    alert("Görev başarıyla eklendi.");
     setActiveTab('tasks');
   };
 
@@ -120,10 +117,8 @@ const App: React.FC = () => {
       completedAt: newStatus === TaskStatus.COMPLETED ? Date.now() : t.completedAt
     }));
     
-    if (updatedList.length > 0) {
-        setTasks(updatedList);
-    } else {
-        // Fallback: eğer liste dönemezse localde güncelle
+    if (updatedList.length > 0) setTasks(updatedList);
+    else {
         const localUpdate = tasks.map(t => t.id === taskId ? { ...t, status: newStatus, comments: comment || t.comments } : t);
         setTasks(localUpdate);
     }
@@ -141,7 +136,6 @@ const App: React.FC = () => {
             <h1 className="text-3xl font-bold tracking-tighter">HidroGörev</h1>
             <p className="text-slate-400 mt-2 text-center text-sm font-medium">Hidrolik Bakım Takip</p>
           </div>
-
           <div className="space-y-6">
             <section>
               <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 ml-1">Kullanıcı Seçimi</h2>
@@ -172,14 +166,12 @@ const App: React.FC = () => {
 
   return (
     <Layout user={currentUser} onLogout={() => setCurrentUser(null)} activeTab={activeTab} setActiveTab={setActiveTab}>
-      
-      {/* Bağlantı Durumu Barı */}
-      <div className={`px-4 py-3 mb-4 rounded-lg text-xs font-bold flex justify-between items-center shadow-sm ${connectionId ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' : 'bg-orange-50 text-orange-800 border border-orange-100'}`}>
+      <div className={`px-4 py-3 mb-4 rounded-lg text-xs font-bold flex justify-between items-center shadow-sm ${connectionId ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
         <span className="flex items-center gap-2">
-           <i className={`fas ${connectionId ? 'fa-link' : 'fa-unlink'}`}></i>
-           {connectionId ? 'Canlı Bağlantı Aktif' : 'Yerel Mod (Senkronizasyon Yok)'}
+           <i className={`fas ${connectionId ? 'fa-link' : 'fa-wifi-slash'}`}></i>
+           {connectionId ? 'Bağlantı Aktif' : 'Yerel Mod (Senkronizasyon Yok)'}
         </span>
-        {connectionId && <span className="font-mono bg-white px-2 py-0.5 rounded border border-emerald-200 opacity-80 text-[10px]">{connectionId.substring(0,4)}..</span>}
+        {connectionId && <span className="font-mono bg-white px-2 py-0.5 rounded border border-emerald-200 opacity-80 text-[10px]">{connectionId.substring(0,6)}...</span>}
       </div>
 
       {activeTab === 'tasks' && (
@@ -195,7 +187,7 @@ const App: React.FC = () => {
             <div className="py-20 text-center text-slate-400">
               <i className="fas fa-clipboard-list text-5xl mb-4 opacity-20"></i>
               <p>Aktif görev bulunmuyor.</p>
-              {!connectionId && <p className="text-xs text-orange-400 mt-2">Buluta bağlanmak için Ayarlar'a gidin.</p>}
+              {!connectionId && <p className="text-xs text-orange-400 mt-2">Bağlantı kurmak için Ayarlar'a gidin.</p>}
             </div>
           ) : (
             <div className="space-y-4 pb-20">
@@ -214,14 +206,13 @@ const App: React.FC = () => {
             {!connectionId && (
                 <div className="bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl text-xs font-bold flex items-center gap-2">
                     <i className="fas fa-exclamation-triangle"></i>
-                    Uyarı: Bağlantı kodu girmediniz. Görevler sadece bu telefonda görünür.
+                    Uyarı: Bağlantı kodu girmediniz. Veriler sadece bu cihazda kalır.
                 </div>
             )}
             <div>
                 <label className="text-xs font-bold text-slate-500 uppercase">Makine</label>
-                <input type="text" className="w-full border border-slate-200 rounded-xl p-3 mt-1 bg-slate-50" value={newTaskMachine} onChange={e => setNewTaskMachine(e.target.value)} required placeholder="Örn: CNC Torna 1" />
+                <input type="text" className="w-full border border-slate-200 rounded-xl p-3 mt-1 bg-slate-50" value={newTaskMachine} onChange={e => setNewTaskMachine(e.target.value)} required placeholder="Örn: Pres 4" />
             </div>
-            
             <div>
                 <label className="text-xs font-bold text-slate-500 uppercase">Usta</label>
                 <select className="w-full border border-slate-200 rounded-xl p-3 mt-1 bg-slate-50" value={newTaskMaster} onChange={e => setNewTaskMaster(e.target.value)} required>
@@ -229,7 +220,6 @@ const App: React.FC = () => {
                     {USTA_LIST.map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
             </div>
-
             <div>
                 <label className="text-xs font-bold text-slate-500 uppercase">Öncelik</label>
                 <div className="flex gap-2 mt-1">
@@ -238,12 +228,10 @@ const App: React.FC = () => {
                     ))}
                 </div>
             </div>
-
             <div>
                 <label className="text-xs font-bold text-slate-500 uppercase">Açıklama</label>
-                <textarea className="w-full border border-slate-200 rounded-xl p-3 mt-1 bg-slate-50 h-24" value={newTaskDescription} onChange={e => setNewTaskDescription(e.target.value)} required placeholder="Yapılacak işi tarif edin..." />
+                <textarea className="w-full border border-slate-200 rounded-xl p-3 mt-1 bg-slate-50 h-24" value={newTaskDescription} onChange={e => setNewTaskDescription(e.target.value)} required placeholder="İş emri detayı..." />
             </div>
-
             <button disabled={loading} className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition-all">
                 {loading ? 'Gönderiliyor...' : 'GÖREVİ YAYINLA'}
             </button>
@@ -254,19 +242,16 @@ const App: React.FC = () => {
       {activeTab === 'profile' && (
         <div className="animate-in slide-in-from-left duration-300">
            <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-6">Bağlantı Ayarları</h2>
-           
            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
               <div className="text-center">
                  <p className="text-xs font-bold text-slate-400 uppercase mb-2">Mevcut Bağlantı Kodu</p>
                  <div className={`text-xl font-mono font-bold tracking-widest py-4 rounded-xl border select-all break-all px-2 ${connectionId ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
                     {connectionId || "BAĞLANTI YOK"}
                  </div>
-                 <p className="text-[10px] text-slate-500 mt-2">Bu kod, tüm ustaların aynı ekranı görmesini sağlar.</p>
               </div>
-
               <div className="grid grid-cols-1 gap-3">
                  <button onClick={handleCreateConnection} className="bg-blue-600 text-white py-4 rounded-xl font-bold text-sm shadow-blue-200 shadow-lg active:scale-95 transition-transform">
-                    <i className="fas fa-magic mr-2"></i>
+                    <i className="fas fa-satellite-dish mr-2"></i>
                     YENİ KOD OLUŞTUR
                  </button>
                  <button onClick={handleJoinConnection} className="bg-white text-slate-700 py-4 rounded-xl font-bold text-sm border border-slate-200 active:scale-95 transition-transform">
@@ -275,17 +260,13 @@ const App: React.FC = () => {
                  </button>
               </div>
            </div>
-
            <div className="mt-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <h3 className="font-bold text-slate-700 mb-2 text-xs uppercase flex items-center gap-2">
-                <i className="fas fa-info-circle"></i> Nasıl Yapılır?
-              </h3>
-              <ol className="text-xs text-slate-600 space-y-2 list-decimal pl-4">
-                 <li>Bir telefondan <b>"Yeni Kod Oluştur"</b> butonuna basın.</li>
-                 <li>Eğer otomatik oluşmazsa sistem size "Yedek Kanal" önerecektir, kabul edin.</li>
-                 <li>Ekranda çıkan kodu kopyalayın.</li>
-                 <li>Diğer telefonlarda <b>"Mevcut Kodu Gir"</b> diyerek bu kodu yapıştırın.</li>
-              </ol>
+              <h3 className="font-bold text-slate-700 mb-2 text-xs uppercase flex items-center gap-2"><i className="fas fa-info-circle"></i> Kullanım Kılavuzu</h3>
+              <ul className="text-xs text-slate-600 space-y-2 list-disc pl-4">
+                 <li>Sadece <b>BİR</b> telefonda "Yeni Kod Oluştur" deyin.</li>
+                 <li>Çıkan kodu diğer tüm telefonlara "Mevcut Kodu Gir" diyerek yazın.</li>
+                 <li>Bağlantı kurulamazsa "Demo Kanalı" seçeneğini kullanabilirsiniz.</li>
+              </ul>
            </div>
         </div>
       )}
