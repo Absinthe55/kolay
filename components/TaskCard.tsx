@@ -7,9 +7,10 @@ interface TaskCardProps {
   user: User;
   onUpdateStatus: (taskId: string, newStatus: TaskStatus, comment?: string, completedImage?: string) => void;
   onDelete?: (taskId: string) => void;
+  onMarkSeen?: (taskId: string) => void;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelete }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelete, onMarkSeen }) => {
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [comment, setComment] = useState('');
   const [completedImage, setCompletedImage] = useState<string | null>(null);
@@ -55,6 +56,16 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
     } else if (task.status === TaskStatus.IN_PROGRESS) {
       setShowCommentInput(true);
       setIsCollapsed(false);
+    }
+  };
+
+  const handleToggleCollapse = () => {
+    const newCollapsed = !isCollapsed;
+    setIsCollapsed(newCollapsed);
+
+    // Kartı açtığında (eğer ustaysa ve daha önce görülmediyse) görüldü işaretle
+    if (!newCollapsed && user.role === 'USTA' && task.masterName === user.name && !task.seenAt && onMarkSeen) {
+        onMarkSeen(task.id);
     }
   };
 
@@ -121,7 +132,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
 
         {/* Header - Tıklanabilir Alan */}
         <div 
-          onClick={() => setIsCollapsed(!isCollapsed)} 
+          onClick={handleToggleCollapse} 
           className={`relative pl-5 pr-4 py-4 cursor-pointer select-none bg-slate-800`}
         >
           <div className="flex justify-between items-start">
@@ -183,9 +194,16 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                       </div>
                       <span className="text-xs font-bold text-slate-400">{task.masterName}</span>
                   </div>
-                  <span className="text-[10px] font-medium text-slate-500">
-                     {new Date(task.createdAt).toLocaleDateString('tr-TR')}
-                  </span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[10px] font-medium text-slate-500">
+                        {new Date(task.createdAt).toLocaleDateString('tr-TR')}
+                    </span>
+                    {task.seenAt && user.role === 'AMIR' && (
+                        <span className="text-[9px] font-bold text-blue-400/80 flex items-center gap-1 mt-0.5">
+                            <i className="fas fa-eye"></i> {formatTime(task.seenAt)}
+                        </span>
+                    )}
+                  </div>
               </div>
           )}
         </div>
@@ -235,14 +253,22 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                 </div>
                 <div className="bg-slate-700/30 border border-slate-700 p-2.5 rounded-lg flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-400"><i className="far fa-calendar text-xs"></i></div>
-                    <div>
-                        <p className="text-[9px] text-slate-500 font-bold uppercase">Tarih</p>
+                    <div className="flex-1">
+                        <p className="text-[9px] text-slate-500 font-bold uppercase">Oluşturuldu</p>
                         <p className="text-xs font-bold text-slate-300">
                            {new Date(task.createdAt).toLocaleDateString('tr-TR')}
                         </p>
-                        <p className="text-[10px] font-medium text-slate-500">
-                           {new Date(task.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
-                        </p>
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-medium text-slate-500">
+                               {new Date(task.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            {task.seenAt && (
+                                <span className="text-[9px] font-bold text-blue-400 bg-blue-900/20 px-1.5 py-0.5 rounded ml-1" title="Usta tarafından görüldü">
+                                    <i className="fas fa-eye mr-1"></i>
+                                    {formatTime(task.seenAt)}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

@@ -520,6 +520,26 @@ const App: React.FC = () => {
     setActiveTab('tasks');
   };
 
+  // GÖREV GÖRÜLDÜ İŞARETLEME
+  const handleMarkTaskSeen = async (taskId: string) => {
+      const task = tasks.find(t => t.id === taskId);
+      // Eğer görev yoksa veya zaten görüldüyse işlem yapma
+      if (!task || task.seenAt) return;
+
+      // Optimistik güncelleme (Hemen arayüzde göster)
+      const now = Date.now();
+      const updatedTasks = tasks.map(t => {
+          if (t.id === taskId) {
+              return { ...t, seenAt: now };
+          }
+          return t;
+      });
+      setTasks(updatedTasks);
+      
+      // Arka planda kaydet
+      await saveAppData({ tasks: updatedTasks, requests, amirs: amirList, ustas: ustaList }, connectionId);
+  };
+
   const updateTaskStatus = async (taskId: string, newStatus: TaskStatus, comment?: string, completedImage?: string) => {
     setLoading(true);
     const now = Date.now();
@@ -761,6 +781,7 @@ const App: React.FC = () => {
                   user={currentUser} 
                   onUpdateStatus={updateTaskStatus}
                   onDelete={handleDeleteTask}
+                  onMarkSeen={handleMarkTaskSeen}
                 />
               ))}
             </div>

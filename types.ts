@@ -27,6 +27,7 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   createdAt: number;
+  seenAt?: number; // Görevin usta tarafından ilk görüldüğü zaman
   startedAt?: number;
   completedAt?: number;
   comments?: string;
