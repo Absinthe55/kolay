@@ -1,73 +1,116 @@
 
 import { Task } from '../types';
 
-const BASE_API_URL = 'https://api.npoint.io';
-const DEFAULT_SYNC_KEY = 'hidro_fabrika_77'; // Varsayılan genel kod
-const LOCAL_STORAGE_KEY = 'hidro_gorev_data';
-const SYNC_KEY_STORAGE = 'hidro_sync_id';
+const API_BASE = 'https://api.npoint.io';
+const LOCAL_KEY_ID = 'hidro_bin_id';
+const LOCAL_KEY_DATA = 'hidro_data';
 
-// Kullanıcının özel birim kodunu al veya varsayılanı döndür
-export const getSyncKey = () => {
-  return localStorage.getItem(SYNC_KEY_STORAGE) || DEFAULT_SYNC_KEY;
+// Varsayılan boş bir havuz (Demo için)
+const DEMO_ID = '908d1788734268713503'; 
+
+export const getStoredBinId = () => {
+  return localStorage.getItem(LOCAL_KEY_ID) || '';
 };
 
-export const setSyncKey = (key: string) => {
-  localStorage.setItem(SYNC_KEY_STORAGE, key.trim());
+export const setStoredBinId = (id: string) => {
+  localStorage.setItem(LOCAL_KEY_ID, id.trim());
 };
 
-export const fetchTasks = async (): Promise<Task[]> => {
-  const syncKey = getSyncKey();
+// Yeni bir bulut alanı oluşturur
+export const createNewBin = async (): Promise<string | null> => {
   try {
-    // URL'ye her seferinde farklı bir sayı ekleyerek telefonun eski veriyi getirmesini engelliyoruz
-    const response = await fetch(`${BASE_API_URL}/${syncKey}?t=${Math.random()}`, {
-      method: 'GET',
-      headers: { 
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      }
-    });
-
-    if (response.ok) {
-      const cloudData = await response.json();
-      if (cloudData && Array.isArray(cloudData.tasks)) {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cloudData.tasks));
-        return cloudData.tasks;
-      }
-    }
-  } catch (error) {
-    console.warn("Bulut verisi çekilemedi:", error);
-  }
-
-  const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
-  return localData ? JSON.parse(localData) : [];
-};
-
-export const saveTasks = async (tasks: Task[]): Promise<boolean> => {
-  const syncKey = getSyncKey();
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(tasks));
-
-  try {
-    const response = await fetch(`${BASE_API_URL}/${syncKey}`, {
-      method: 'PUT',
+    const response = await fetch(API_BASE, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tasks, updated: Date.now() })
+      body: JSON.stringify({ tasks: [], updatedAt: Date.now() })
     });
-
-    if (response.status === 404) {
-      // Eğer bu birim koduyla ilk kez veri gönderiliyorsa oluştur
-      const createResponse = await fetch(BASE_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tasks, updated: Date.now() })
-      });
-      // Not: npoint POST yapınca yeni bir ID verir. 
-      // Ancak biz PUT ile belirli bir key üzerinden gitmeyi tercih ediyoruz.
-      return createResponse.ok;
+    
+    if (response.ok) {
+      const data = await response.json();
+      // npoint { "id": "..." } döner
+      if (data && data.id) {
+        setStoredBinId(data.id);
+        return data.id;
+      }
     }
+  } catch (e) {
+    console.error("Bin oluşturulamadı", e);
+  }
+  return null;
+};
 
+// Verileri çeker
+export const fetchTasks = async (binId?: string): Promise<Task[]> => {
+  const id = binId || getStoredBinId() || DEMO_ID;
+  
+  try {
+    const response = await fetch(`${API_BASE}/${id}?t=${Date.now()}`, {
+      cache: 'no-store'
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data && Array.isArray(data.tasks)) {
+        localStorage.setItem(LOCAL_KEY_DATA, JSON.stringify(data.tasks));
+        return data.tasks;
+      }
+    }
+  } catch (e) {
+    console.warn("Veri çekilemedi, yerel veri gösteriliyor.");
+  }
+  
+  const local = localStorage.getItem(LOCAL_KEY_DATA);
+  return local ? JSON.parse(local) : [];
+};
+
+// Veriyi kaydeder (Önce indir, birleştir, sonra yükle - Optimistic Locking benzeri)
+export const saveTasks = async (newTasks: Task[], binId?: string): Promise<boolean> => {
+  const id = binId || getStoredBinId() || DEMO_ID;
+  
+  // Önce yerele yedekle
+  localStorage.setItem(LOCAL_KEY_DATA, JSON.stringify(newTasks));
+
+  try {
+    const response = await fetch(`${API_BASE}/${id}`, {
+      method: 'POST', // Npoint güncelleme için POST kullanabilir
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tasks: newTasks, updatedAt: Date.now() })
+    });
     return response.ok;
-  } catch (error) {
-    console.error("Kayıt hatası:", error);
+  } catch (e) {
+    console.error("Kaydedilemedi", e);
     return false;
+  }
+};
+
+// Tek bir görevi güvenli ekleme (Çakışma önleyici)
+export const safeAddTask = async (task: Task): Promise<Task[]> => {
+  const id = getStoredBinId() || DEMO_ID;
+  
+  try {
+    // 1. En güncel veriyi çek
+    const currentTasks = await fetchTasks(id);
+    // 2. Yeni görevi ekle
+    const updatedTasks = [task, ...currentTasks];
+    // 3. Geri yükle
+    await saveTasks(updatedTasks, id);
+    return updatedTasks;
+  } catch (e) {
+    // Hata olursa sadece yerel veriye ekle ve döndür
+    const local = await fetchTasks(id);
+    return [task, ...local];
+  }
+};
+
+// Durum güncelleme (Çakışma önleyici)
+export const safeUpdateTask = async (taskId: string, updater: (t: Task) => Task): Promise<Task[]> => {
+  const id = getStoredBinId() || DEMO_ID;
+  try {
+    const currentTasks = await fetchTasks(id);
+    const updatedTasks = currentTasks.map(t => t.id === taskId ? updater(t) : t);
+    await saveTasks(updatedTasks, id);
+    return updatedTasks;
+  } catch (e) {
+    return [];
   }
 };
