@@ -1,12 +1,14 @@
 
 import { Task } from '../types';
 
-const API_BASE = 'https://api.npoint.io';
+// JsonBlob servisi tarayıcı tabanlı POST istekleri için daha güvenilirdir
+const API_BASE = 'https://jsonblob.com/api/jsonBlob';
 const LOCAL_KEY_ID = 'hidro_bin_id';
 const LOCAL_KEY_DATA = 'hidro_data';
 
-// Varsayılan boş bir havuz (Demo için)
-const DEMO_ID = '908d1788734268713503'; 
+// Demo amaçlı hazır bir ID (Eğer oluşturma başarısız olursa bu kullanılır)
+// Bu ID statik bir test verisidir.
+const DEMO_ID = '1347094956795461632'; 
 
 export const getStoredBinId = () => {
   return localStorage.getItem(LOCAL_KEY_ID) || '';
@@ -16,36 +18,50 @@ export const setStoredBinId = (id: string) => {
   localStorage.setItem(LOCAL_KEY_ID, id.trim());
 };
 
-// Yeni bir bulut alanı oluşturur
+// Yeni bir bulut alanı oluşturur (JsonBlob POST)
 export const createNewBin = async (): Promise<string | null> => {
   try {
     const response = await fetch(API_BASE, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({ tasks: [], updatedAt: Date.now() })
     });
     
     if (response.ok) {
-      const data = await response.json();
-      // npoint { "id": "..." } döner
-      if (data && data.id) {
-        setStoredBinId(data.id);
-        return data.id;
+      // JsonBlob ID'yi Location header'ında döndürür
+      const location = response.headers.get('Location');
+      if (location) {
+        const id = location.substring(location.lastIndexOf('/') + 1);
+        setStoredBinId(id);
+        return id;
       }
     }
   } catch (e) {
-    console.error("Bin oluşturulamadı", e);
+    console.error("Bin oluşturulamadı:", e);
   }
   return null;
 };
 
-// Verileri çeker
+// Verileri çeker (JsonBlob GET)
 export const fetchTasks = async (binId?: string): Promise<Task[]> => {
-  const id = binId || getStoredBinId() || DEMO_ID;
+  const id = binId || getStoredBinId();
+  
+  // Eğer ID yoksa yerel veriyi dön, demo ID'ye gitme (kullanıcıya yanlış veri göstermemek için)
+  if (!id) {
+    const local = localStorage.getItem(LOCAL_KEY_DATA);
+    return local ? JSON.parse(local) : [];
+  }
   
   try {
-    const response = await fetch(`${API_BASE}/${id}?t=${Date.now()}`, {
-      cache: 'no-store'
+    const response = await fetch(`${API_BASE}/${id}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache' // Önbelleği zorla temizle
+      }
     });
     
     if (response.ok) {
@@ -56,24 +72,29 @@ export const fetchTasks = async (binId?: string): Promise<Task[]> => {
       }
     }
   } catch (e) {
-    console.warn("Veri çekilemedi, yerel veri gösteriliyor.");
+    console.warn("Veri çekilemedi, yerel veri kullanılıyor.");
   }
   
   const local = localStorage.getItem(LOCAL_KEY_DATA);
   return local ? JSON.parse(local) : [];
 };
 
-// Veriyi kaydeder (Önce indir, birleştir, sonra yükle - Optimistic Locking benzeri)
+// Veriyi kaydeder (JsonBlob PUT)
 export const saveTasks = async (newTasks: Task[], binId?: string): Promise<boolean> => {
-  const id = binId || getStoredBinId() || DEMO_ID;
+  const id = binId || getStoredBinId();
   
-  // Önce yerele yedekle
+  // Yerel yedeği al
   localStorage.setItem(LOCAL_KEY_DATA, JSON.stringify(newTasks));
+
+  if (!id) return true; // Sadece yerel kayıt yapıldı
 
   try {
     const response = await fetch(`${API_BASE}/${id}`, {
-      method: 'POST', // Npoint güncelleme için POST kullanabilir
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({ tasks: newTasks, updatedAt: Date.now() })
     });
     return response.ok;
@@ -83,34 +104,55 @@ export const saveTasks = async (newTasks: Task[], binId?: string): Promise<boole
   }
 };
 
-// Tek bir görevi güvenli ekleme (Çakışma önleyici)
+// Güvenli Ekleme (Optimistic Update + Server Sync)
 export const safeAddTask = async (task: Task): Promise<Task[]> => {
-  const id = getStoredBinId() || DEMO_ID;
+  const id = getStoredBinId();
   
+  // 1. Önce sunucudaki en güncel veriyi çekmeye çalış
+  let currentTasks: Task[] = [];
   try {
-    // 1. En güncel veriyi çek
-    const currentTasks = await fetchTasks(id);
-    // 2. Yeni görevi ekle
-    const updatedTasks = [task, ...currentTasks];
-    // 3. Geri yükle
-    await saveTasks(updatedTasks, id);
-    return updatedTasks;
+    if (id) {
+        currentTasks = await fetchTasks(id);
+    } else {
+        // ID yoksa localden al
+        const local = localStorage.getItem(LOCAL_KEY_DATA);
+        currentTasks = local ? JSON.parse(local) : [];
+    }
   } catch (e) {
-    // Hata olursa sadece yerel veriye ekle ve döndür
-    const local = await fetchTasks(id);
-    return [task, ...local];
+     // Hata durumunda localden devam et
+     const local = localStorage.getItem(LOCAL_KEY_DATA);
+     currentTasks = local ? JSON.parse(local) : [];
   }
+
+  // 2. Yeni listeyi oluştur
+  const updatedTasks = [task, ...currentTasks];
+
+  // 3. Sunucuya (varsa) ve yerele kaydet
+  await saveTasks(updatedTasks, id);
+  return updatedTasks;
 };
 
-// Durum güncelleme (Çakışma önleyici)
+// Güvenli Güncelleme
 export const safeUpdateTask = async (taskId: string, updater: (t: Task) => Task): Promise<Task[]> => {
-  const id = getStoredBinId() || DEMO_ID;
+  const id = getStoredBinId();
+  let currentTasks: Task[] = [];
+
   try {
-    const currentTasks = await fetchTasks(id);
-    const updatedTasks = currentTasks.map(t => t.id === taskId ? updater(t) : t);
-    await saveTasks(updatedTasks, id);
-    return updatedTasks;
-  } catch (e) {
-    return [];
+    if (id) {
+        currentTasks = await fetchTasks(id);
+    } else {
+        const local = localStorage.getItem(LOCAL_KEY_DATA);
+        currentTasks = local ? JSON.parse(local) : [];
+    }
+  } catch {
+      const local = localStorage.getItem(LOCAL_KEY_DATA);
+      currentTasks = local ? JSON.parse(local) : [];
   }
+
+  const updatedTasks = currentTasks.map(t => t.id === taskId ? updater(t) : t);
+  await saveTasks(updatedTasks, id);
+  return updatedTasks;
 };
+
+// Yedek Kanal ID'sini getirir (Kullanıcı oluşturamazsa bunu kullanır)
+export const getEmergencyId = () => DEMO_ID;

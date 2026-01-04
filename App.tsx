@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Task, User, TaskStatus, TaskPriority } from './types';
-import { fetchTasks, createNewBin, getStoredBinId, setStoredBinId, safeAddTask, safeUpdateTask } from './services/dbService';
+import { fetchTasks, createNewBin, getStoredBinId, setStoredBinId, safeAddTask, safeUpdateTask, getEmergencyId } from './services/dbService';
 import Layout from './components/Layout';
 import TaskCard from './components/TaskCard';
 
@@ -32,8 +32,10 @@ const App: React.FC = () => {
   useEffect(() => {
     loadData();
     const interval = setInterval(() => {
-      // Arka planda sessizce güncelle
-      fetchTasks(connectionId).then(setTasks);
+      // Arka planda sessizce güncelle (eğer bağlantı varsa)
+      if (connectionId) {
+        fetchTasks(connectionId).then(setTasks);
+      }
     }, 5000); 
     return () => clearInterval(interval);
   }, [connectionId, loadData]);
@@ -47,28 +49,38 @@ const App: React.FC = () => {
   };
 
   const handleCreateConnection = async () => {
-    if(!confirm("Yeni bir bağlantı kodu oluşturulacak. Diğer telefonlara bu kodu girmeniz gerekecek.")) return;
+    if(!confirm("Yeni bir bağlantı oluşturulacak. Bu işlem internet bağlantısı gerektirir.")) return;
+    
     setLoading(true);
     const newId = await createNewBin();
     setLoading(false);
+    
     if (newId) {
       setConnectionId(newId);
-      alert("Yeni Bağlantı Oluşturuldu!\n\nKOD: " + newId + "\n\nBu kodu diğer telefondaki 'Ayarlar' bölümüne girin.");
+      alert("✅ BAŞARILI!\n\nOluşturulan Kod: " + newId + "\n\nBu kodu diğer telefonlara girerek eşleşebilirsiniz.");
       loadData();
     } else {
-      alert("Bağlantı oluşturulamadı, internetinizi kontrol edin.");
+      // Hata durumunda alternatif sun
+      if(confirm("⚠ Bağlantı otomatik oluşturulamadı (Güvenlik duvarı veya ağ hatası).\n\nHazır 'Yedek Kanal' kullanılsın mı?")) {
+          const emergencyId = getEmergencyId();
+          setStoredBinId(emergencyId);
+          setConnectionId(emergencyId);
+          alert("Yedek kanala bağlandınız. Kodunuz: " + emergencyId);
+          loadData();
+      }
     }
   };
 
   const handleJoinConnection = () => {
     const code = prompt("Diğer telefondaki Bağlantı Kodunu girin:");
     if (code && code.trim().length > 5) {
-      setStoredBinId(code.trim());
-      setConnectionId(code.trim());
+      const cleanCode = code.trim();
+      setStoredBinId(cleanCode);
+      setConnectionId(cleanCode);
       loadData();
-      alert("Bağlantı sağlandı! Veriler indiriliyor...");
+      alert("Bağlantı ayarlandı. Veriler kontrol ediliyor...");
     } else if (code) {
-      alert("Geçersiz kod.");
+      alert("Geçersiz veya çok kısa kod.");
     }
   };
 
@@ -95,6 +107,7 @@ const App: React.FC = () => {
     setNewTaskMachine('');
     setNewTaskDescription('');
     setNewTaskMaster('');
+    alert("Görev oluşturuldu!");
     setActiveTab('tasks');
   };
 
@@ -161,12 +174,12 @@ const App: React.FC = () => {
     <Layout user={currentUser} onLogout={() => setCurrentUser(null)} activeTab={activeTab} setActiveTab={setActiveTab}>
       
       {/* Bağlantı Durumu Barı */}
-      <div className={`px-4 py-2 mb-4 rounded-lg text-xs font-bold flex justify-between items-center ${connectionId ? 'bg-blue-50 text-blue-800 border border-blue-100' : 'bg-red-50 text-red-800 border border-red-100'}`}>
+      <div className={`px-4 py-3 mb-4 rounded-lg text-xs font-bold flex justify-between items-center shadow-sm ${connectionId ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' : 'bg-orange-50 text-orange-800 border border-orange-100'}`}>
         <span className="flex items-center gap-2">
-           <i className={`fas ${connectionId ? 'fa-wifi' : 'fa-ban'}`}></i>
-           {connectionId ? 'Bağlantı Aktif' : 'Bağlantı Yok - Demo Modu'}
+           <i className={`fas ${connectionId ? 'fa-link' : 'fa-unlink'}`}></i>
+           {connectionId ? 'Canlı Bağlantı Aktif' : 'Yerel Mod (Senkronizasyon Yok)'}
         </span>
-        {connectionId && <span className="font-mono bg-white px-2 py-0.5 rounded border border-blue-100 opacity-70">{connectionId.substring(0,6)}...</span>}
+        {connectionId && <span className="font-mono bg-white px-2 py-0.5 rounded border border-emerald-200 opacity-80 text-[10px]">{connectionId.substring(0,4)}..</span>}
       </div>
 
       {activeTab === 'tasks' && (
@@ -182,6 +195,7 @@ const App: React.FC = () => {
             <div className="py-20 text-center text-slate-400">
               <i className="fas fa-clipboard-list text-5xl mb-4 opacity-20"></i>
               <p>Aktif görev bulunmuyor.</p>
+              {!connectionId && <p className="text-xs text-orange-400 mt-2">Buluta bağlanmak için Ayarlar'a gidin.</p>}
             </div>
           ) : (
             <div className="space-y-4 pb-20">
@@ -197,6 +211,12 @@ const App: React.FC = () => {
         <div className="animate-in slide-in-from-right duration-300">
           <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-6">Görev Ver</h2>
           <form onSubmit={handleCreateTask} className="space-y-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            {!connectionId && (
+                <div className="bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl text-xs font-bold flex items-center gap-2">
+                    <i className="fas fa-exclamation-triangle"></i>
+                    Uyarı: Bağlantı kodu girmediniz. Görevler sadece bu telefonda görünür.
+                </div>
+            )}
             <div>
                 <label className="text-xs font-bold text-slate-500 uppercase">Makine</label>
                 <input type="text" className="w-full border border-slate-200 rounded-xl p-3 mt-1 bg-slate-50" value={newTaskMachine} onChange={e => setNewTaskMachine(e.target.value)} required placeholder="Örn: CNC Torna 1" />
@@ -238,32 +258,34 @@ const App: React.FC = () => {
            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
               <div className="text-center">
                  <p className="text-xs font-bold text-slate-400 uppercase mb-2">Mevcut Bağlantı Kodu</p>
-                 <div className="text-2xl font-mono font-bold text-slate-800 tracking-widest bg-slate-100 py-3 rounded-xl border border-slate-200 select-all">
-                    {connectionId || "YOK"}
+                 <div className={`text-xl font-mono font-bold tracking-widest py-4 rounded-xl border select-all break-all px-2 ${connectionId ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
+                    {connectionId || "BAĞLANTI YOK"}
                  </div>
-                 <p className="text-[10px] text-slate-500 mt-2">Bu kodu kopyalayıp diğer telefonlara girerek ortak çalışabilirsiniz.</p>
+                 <p className="text-[10px] text-slate-500 mt-2">Bu kod, tüm ustaların aynı ekranı görmesini sağlar.</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                 <button onClick={handleCreateConnection} className="bg-blue-50 text-blue-700 py-3 rounded-xl font-bold text-xs border border-blue-100 hover:bg-blue-100">
-                    <i className="fas fa-plus-circle mb-1 block text-lg"></i>
-                    YENİ OLUŞTUR
+              <div className="grid grid-cols-1 gap-3">
+                 <button onClick={handleCreateConnection} className="bg-blue-600 text-white py-4 rounded-xl font-bold text-sm shadow-blue-200 shadow-lg active:scale-95 transition-transform">
+                    <i className="fas fa-magic mr-2"></i>
+                    YENİ KOD OLUŞTUR
                  </button>
-                 <button onClick={handleJoinConnection} className="bg-emerald-50 text-emerald-700 py-3 rounded-xl font-bold text-xs border border-emerald-100 hover:bg-emerald-100">
-                    <i className="fas fa-link mb-1 block text-lg"></i>
-                    KOD GİR
+                 <button onClick={handleJoinConnection} className="bg-white text-slate-700 py-4 rounded-xl font-bold text-sm border border-slate-200 active:scale-95 transition-transform">
+                    <i className="fas fa-keyboard mr-2"></i>
+                    MEVCUT KODU GİR
                  </button>
               </div>
            </div>
 
-           <div className="mt-8 bg-slate-100 p-4 rounded-xl border border-slate-200">
-              <h3 className="font-bold text-slate-700 mb-2 text-sm">Nasıl Kullanılır?</h3>
-              <ul className="text-xs text-slate-600 space-y-2 list-disc pl-4">
-                 <li>Bir telefonda <b>"Yeni Oluştur"</b> deyin.</li>
-                 <li>Ekranda çıkan uzun kodu kopyalayın.</li>
-                 <li>Diğer telefonda <b>"Kod Gir"</b> butonuna basıp bu kodu yapıştırın.</li>
-                 <li>Artık iki cihaz da aynı listeyi görecektir.</li>
-              </ul>
+           <div className="mt-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <h3 className="font-bold text-slate-700 mb-2 text-xs uppercase flex items-center gap-2">
+                <i className="fas fa-info-circle"></i> Nasıl Yapılır?
+              </h3>
+              <ol className="text-xs text-slate-600 space-y-2 list-decimal pl-4">
+                 <li>Bir telefondan <b>"Yeni Kod Oluştur"</b> butonuna basın.</li>
+                 <li>Eğer otomatik oluşmazsa sistem size "Yedek Kanal" önerecektir, kabul edin.</li>
+                 <li>Ekranda çıkan kodu kopyalayın.</li>
+                 <li>Diğer telefonlarda <b>"Mevcut Kodu Gir"</b> diyerek bu kodu yapıştırın.</li>
+              </ol>
            </div>
         </div>
       )}
