@@ -1,4 +1,3 @@
-
 import { Task } from '../types';
 
 // İki farklı sağlayıcı kullanıyoruz.
@@ -14,9 +13,17 @@ const PROVIDER_NPOINT = {
 
 const LOCAL_KEY_ID = 'hidro_bin_id';
 const LOCAL_KEY_DATA = 'hidro_data';
+const LOCAL_KEY_LISTS = 'hidro_lists';
 
 // Demo ID
 const DEMO_ID = '908d1788734268713503'; 
+
+export interface AppData {
+  tasks: Task[];
+  amirs: string[];
+  ustas: string[];
+  updatedAt: number;
+}
 
 export const getStoredBinId = () => {
   return localStorage.getItem(LOCAL_KEY_ID) || '';
@@ -49,7 +56,7 @@ const getProviderUrl = (id: string) => {
   return `${PROVIDER_NPOINT.api}/${id}`;
 };
 
-// Sadece bağlantı testi yapar (Veri indirmez)
+// Sadece bağlantı testi yapar
 export const checkConnection = async (id: string): Promise<boolean> => {
     if (!id) return false;
     const url = getProviderUrl(id);
@@ -61,14 +68,21 @@ export const checkConnection = async (id: string): Promise<boolean> => {
     }
 };
 
-// Yeni bir bulut alanı oluşturur (Sırayla dener)
-export const createNewBin = async (): Promise<string | null> => {
+// Yeni bir bulut alanı oluşturur
+export const createNewBin = async (defaultAmirs: string[], defaultUstas: string[]): Promise<string | null> => {
+  const initialData: AppData = {
+    tasks: [],
+    amirs: defaultAmirs,
+    ustas: defaultUstas,
+    updatedAt: Date.now()
+  };
+
   // 1. Önce JsonBlob dene
   try {
     const response = await fetch(PROVIDER_JSONBLOB.api, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ tasks: [], updatedAt: Date.now() })
+      body: JSON.stringify(initialData)
     });
     
     if (response.ok) {
@@ -88,7 +102,7 @@ export const createNewBin = async (): Promise<string | null> => {
     const response = await fetch(PROVIDER_NPOINT.api, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tasks: [], updatedAt: Date.now() })
+      body: JSON.stringify(initialData)
     });
 
     if (response.ok) {
@@ -105,13 +119,22 @@ export const createNewBin = async (): Promise<string | null> => {
   return null;
 };
 
-// Verileri çeker
-export const fetchTasks = async (binId?: string): Promise<Task[]> => {
+// Tüm verileri (Görevler + Personel Listesi) çeker
+export const fetchAppData = async (binId?: string): Promise<AppData> => {
   const id = binId || getStoredBinId();
   
+  // Varsayılan boş yapı
+  const emptyData: AppData = { tasks: [], amirs: [], ustas: [], updatedAt: 0 };
+
   if (!id) {
-    const local = localStorage.getItem(LOCAL_KEY_DATA);
-    return local ? JSON.parse(local) : [];
+    const localDataStr = localStorage.getItem(LOCAL_KEY_DATA);
+    if (localDataStr) {
+       // Eski format kontrolü (sadece array ise)
+       const parsed = JSON.parse(localDataStr);
+       if (Array.isArray(parsed)) return { ...emptyData, tasks: parsed };
+       return { ...emptyData, ...parsed };
+    }
+    return emptyData;
   }
   
   const url = getProviderUrl(id);
@@ -124,12 +147,25 @@ export const fetchTasks = async (binId?: string): Promise<Task[]> => {
     
     if (response.ok) {
       const data = await response.json();
-      const tasks = data.tasks || (Array.isArray(data) ? data : []);
-      
-      if (Array.isArray(tasks)) {
-        localStorage.setItem(LOCAL_KEY_DATA, JSON.stringify(tasks));
-        return tasks;
+      // Veri formatını normalize et
+      let tasks: Task[] = [];
+      let amirs: string[] = [];
+      let ustas: string[] = [];
+
+      if (Array.isArray(data)) {
+        // Eski format (sadece task array)
+        tasks = data;
+      } else {
+        // Yeni format (obje)
+        tasks = Array.isArray(data.tasks) ? data.tasks : [];
+        amirs = Array.isArray(data.amirs) ? data.amirs : [];
+        ustas = Array.isArray(data.ustas) ? data.ustas : [];
       }
+      
+      const normalizedData: AppData = { tasks, amirs, ustas, updatedAt: data.updatedAt || Date.now() };
+      
+      localStorage.setItem(LOCAL_KEY_DATA, JSON.stringify(normalizedData));
+      return normalizedData;
     }
   } catch (e) {
     console.warn("Veri çekme hatası:", e);
@@ -137,13 +173,20 @@ export const fetchTasks = async (binId?: string): Promise<Task[]> => {
   
   // Hata durumunda local veriyi dön
   const local = localStorage.getItem(LOCAL_KEY_DATA);
-  return local ? JSON.parse(local) : [];
+  if (local) {
+      const parsed = JSON.parse(local);
+      if (Array.isArray(parsed)) return { ...emptyData, tasks: parsed };
+      return { ...emptyData, ...parsed };
+  }
+  return emptyData;
 };
 
-// Veriyi kaydeder
-export const saveTasks = async (newTasks: Task[], binId?: string): Promise<boolean> => {
+// Tüm veriyi kaydeder
+export const saveAppData = async (data: Omit<AppData, 'updatedAt'>, binId?: string): Promise<boolean> => {
   const id = binId || getStoredBinId();
-  localStorage.setItem(LOCAL_KEY_DATA, JSON.stringify(newTasks));
+  const payload = { ...data, updatedAt: Date.now() };
+  
+  localStorage.setItem(LOCAL_KEY_DATA, JSON.stringify(payload));
 
   if (!id) return true;
 
@@ -154,42 +197,12 @@ export const saveTasks = async (newTasks: Task[], binId?: string): Promise<boole
     const response = await fetch(url, {
       method: method,
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ tasks: newTasks, updatedAt: Date.now() })
+      body: JSON.stringify(payload)
     });
     return response.ok;
   } catch (e) {
     return false;
   }
-};
-
-// Güvenli Ekleme
-export const safeAddTask = async (task: Task): Promise<Task[]> => {
-  const id = getStoredBinId();
-  let currentTasks: Task[] = [];
-  try {
-    currentTasks = id ? await fetchTasks(id) : JSON.parse(localStorage.getItem(LOCAL_KEY_DATA) || '[]');
-  } catch {
-    currentTasks = JSON.parse(localStorage.getItem(LOCAL_KEY_DATA) || '[]');
-  }
-
-  const updatedTasks = [task, ...currentTasks];
-  await saveTasks(updatedTasks, id);
-  return updatedTasks;
-};
-
-// Güvenli Güncelleme
-export const safeUpdateTask = async (taskId: string, updater: (t: Task) => Task): Promise<Task[]> => {
-  const id = getStoredBinId();
-  let currentTasks: Task[] = [];
-  try {
-    currentTasks = id ? await fetchTasks(id) : JSON.parse(localStorage.getItem(LOCAL_KEY_DATA) || '[]');
-  } catch {
-    currentTasks = JSON.parse(localStorage.getItem(LOCAL_KEY_DATA) || '[]');
-  }
-
-  const updatedTasks = currentTasks.map(t => t.id === taskId ? updater(t) : t);
-  await saveTasks(updatedTasks, id);
-  return updatedTasks;
 };
 
 export const getEmergencyId = () => DEMO_ID;
