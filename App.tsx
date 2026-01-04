@@ -5,7 +5,6 @@ import { fetchTasks, saveTasks } from './services/dbService';
 import Layout from './components/Layout';
 import TaskCard from './components/TaskCard';
 
-// Sabit Personel Listesi
 const AMIR_LIST = ['Birim Amiri Volkan', 'Vardiya Amiri Selçuk'];
 const USTA_LIST = ['Usta Ahmet', 'Usta Mehmet', 'Usta Can', 'Usta Serkan', 'Usta Osman', 'Usta İbrahim'];
 
@@ -14,9 +13,9 @@ const App: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [syncError, setSyncError] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'tasks' | 'add' | 'profile'>('tasks');
   
-  // Form State
   const [newTaskMachine, setNewTaskMachine] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskMaster, setNewTaskMaster] = useState('');
@@ -28,6 +27,7 @@ const App: React.FC = () => {
       const data = await fetchTasks();
       setTasks(data);
       setSyncError(false);
+      setLastSyncTime(new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     } catch (err) {
       setSyncError(true);
     } finally {
@@ -37,7 +37,8 @@ const App: React.FC = () => {
 
   useEffect(() => {
     refreshData();
-    const interval = setInterval(refreshData, 30000);
+    // Diğer cihazlardaki değişiklikleri görmek için her 10 saniyede bir kontrol et
+    const interval = setInterval(refreshData, 10000);
     return () => clearInterval(interval);
   }, [refreshData]);
 
@@ -73,7 +74,11 @@ const App: React.FC = () => {
     setActiveTab('tasks');
 
     const success = await saveTasks(updatedTasks);
-    if (!success) setSyncError(true);
+    if (!success) {
+      setSyncError(true);
+    } else {
+      setLastSyncTime(new Date().toLocaleTimeString('tr-TR'));
+    }
   };
 
   const updateTaskStatus = async (taskId: string, newStatus: TaskStatus, comment?: string) => {
@@ -92,6 +97,7 @@ const App: React.FC = () => {
     setTasks(updatedTasks);
     const success = await saveTasks(updatedTasks);
     if (!success) setSyncError(true);
+    else setLastSyncTime(new Date().toLocaleTimeString('tr-TR'));
   };
 
   if (!currentUser) {
@@ -107,7 +113,6 @@ const App: React.FC = () => {
           </div>
 
           <div className="space-y-8">
-            {/* AMİR GİRİŞ BÖLÜMÜ */}
             <section>
               <h2 className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-4 ml-1 flex items-center gap-2">
                 <i className="fas fa-user-shield"></i> Amir Girişi
@@ -126,7 +131,6 @@ const App: React.FC = () => {
               </div>
             </section>
 
-            {/* USTA GİRİŞ BÖLÜMÜ */}
             <section>
               <h2 className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-4 ml-1 flex items-center gap-2">
                 <i className="fas fa-wrench"></i> Usta Girişi
@@ -147,7 +151,7 @@ const App: React.FC = () => {
           </div>
           
           <p className="text-slate-500 text-[10px] text-center mt-12 uppercase tracking-widest font-bold opacity-50">
-            Hidrolik Birimi Takip Sistemi v1.2
+            Hidrolik Birimi Takip Sistemi v1.3
           </p>
         </div>
       </div>
@@ -167,14 +171,16 @@ const App: React.FC = () => {
     >
       {activeTab === 'tasks' && (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="flex justify-between items-end mb-6">
+          <div className="flex justify-between items-start mb-6">
             <div>
               <h2 className="text-2xl font-black text-slate-900 tracking-tight">Görevler</h2>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-slate-500 font-semibold">{filteredTasks.length} toplam görev</p>
+              <div className="flex flex-col gap-1 mt-1">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                  <i className="fas fa-clock mr-1"></i> Son Güncelleme: {lastSyncTime || '...'}
+                </p>
                 {syncError && (
-                  <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">
-                    <i className="fas fa-cloud-slash mr-1"></i> BULUT SENKRONİZASYON BEKLİYOR
+                  <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md font-bold w-fit">
+                    <i className="fas fa-cloud-slash mr-1"></i> SENKRONİZASYON BEKLİYOR
                   </span>
                 )}
               </div>
@@ -182,7 +188,7 @@ const App: React.FC = () => {
             <button 
               onClick={refreshData} 
               disabled={loading}
-              className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-blue-600 transition-colors shadow-sm"
+              className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-blue-600 transition-colors shadow-sm active:rotate-180 duration-500"
             >
               <i className={`fas fa-sync-alt ${loading ? 'animate-spin' : ''}`}></i>
             </button>
@@ -308,7 +314,7 @@ const App: React.FC = () => {
           <div className="space-y-3">
              <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 text-emerald-800 text-sm">
                 <i className="fas fa-shield-check mr-2"></i>
-                Verileriniz cihazınıza otomatik kaydedilir. İnternet olduğunda bulut ile eşitlenir.
+                Cihazlar arası senkronizasyon her 10 saniyede bir otomatik gerçekleşir.
              </div>
 
             <button 
