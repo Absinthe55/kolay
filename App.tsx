@@ -223,12 +223,22 @@ const App: React.FC = () => {
 
   const updateTaskStatus = async (taskId: string, newStatus: TaskStatus, comment?: string) => {
     setLoading(true);
-    const updatedTasks = tasks.map(t => t.id === taskId ? {
-      ...t,
-      status: newStatus,
-      comments: comment || t.comments,
-      completedAt: newStatus === TaskStatus.COMPLETED ? Date.now() : t.completedAt
-    } : t);
+    const now = Date.now();
+
+    const updatedTasks = tasks.map(t => {
+        if (t.id === taskId) {
+            return {
+              ...t,
+              status: newStatus,
+              comments: comment || t.comments,
+              // Eğer yeni durum IN_PROGRESS ise ve daha önce başlamadıysa başlama zamanını kaydet
+              startedAt: newStatus === TaskStatus.IN_PROGRESS ? (t.startedAt || now) : t.startedAt,
+              // Eğer yeni durum COMPLETED ise bitiş zamanını kaydet
+              completedAt: newStatus === TaskStatus.COMPLETED ? now : t.completedAt
+            };
+        }
+        return t;
+    });
     
     setTasks(updatedTasks);
     await saveAppData({ tasks: updatedTasks, amirs: amirList, ustas: ustaList }, connectionId);

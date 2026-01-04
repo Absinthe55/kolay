@@ -2,7 +2,8 @@
 export enum TaskStatus {
   PENDING = 'PENDING',
   IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED'
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED'
 }
 
 export enum TaskPriority {
@@ -20,6 +21,7 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   createdAt: number;
+  startedAt?: number;
   completedAt?: number;
   comments?: string;
 }
