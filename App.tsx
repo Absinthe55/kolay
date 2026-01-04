@@ -53,8 +53,8 @@ const App: React.FC = () => {
     // 1. İlk açılışta veri yükle
     loadData();
 
-    // 2. 3 saniye sonra otomatik bağlantı kontrolü
-    const autoConnectTimer = setTimeout(async () => {
+    // 2. Anında otomatik bağlantı kontrolü (Gecikme kaldırıldı)
+    const initAutoConnect = async () => {
        const currentId = getStoredBinId();
        if (!currentId) {
           console.log("Otomatik bağlantı başlatılıyor...");
@@ -68,10 +68,11 @@ const App: React.FC = () => {
              setTasks(data.tasks);
              if (data.amirs.length > 0) setAmirList(data.amirs);
              if (data.ustas.length > 0) setUstaList(data.ustas);
-             alert("✅ Sisteme otomatik olarak bağlandınız!");
+             // alert("✅ Sisteme otomatik olarak bağlandınız!"); // Kullanıcıyı rahatsız etmemek için alert kaldırıldı
           }
        }
-    }, 3000);
+    };
+    initAutoConnect();
 
     // 3. Periyodik güncelleme
     const interval = setInterval(() => {
@@ -86,7 +87,6 @@ const App: React.FC = () => {
 
     return () => {
         clearInterval(interval);
-        clearTimeout(autoConnectTimer);
     };
   }, [connectionId, loadData]);
 
@@ -263,7 +263,8 @@ const App: React.FC = () => {
     setActiveTab('tasks');
   };
 
-  const updateTaskStatus = async (taskId: string, newStatus: TaskStatus, comment?: string) => {
+  // Status güncelleme fonksiyonu (artık completedImage de alıyor)
+  const updateTaskStatus = async (taskId: string, newStatus: TaskStatus, comment?: string, completedImage?: string) => {
     setLoading(true);
     const now = Date.now();
 
@@ -274,7 +275,8 @@ const App: React.FC = () => {
               status: newStatus,
               comments: comment || t.comments,
               startedAt: newStatus === TaskStatus.IN_PROGRESS ? (t.startedAt || now) : t.startedAt,
-              completedAt: newStatus === TaskStatus.COMPLETED ? now : t.completedAt
+              completedAt: newStatus === TaskStatus.COMPLETED ? now : t.completedAt,
+              completedImage: completedImage || t.completedImage // Bitiş resmi varsa kaydet
             };
         }
         return t;
@@ -540,7 +542,7 @@ const App: React.FC = () => {
            <div className="mt-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
               <h3 className="font-bold text-slate-700 mb-2 text-xs uppercase flex items-center gap-2"><i className="fas fa-info-circle"></i> Otomatik Bağlantı</h3>
               <p className="text-xs text-slate-600">
-                  Sistem açıldığında 3 saniye içinde bağlantı yoksa otomatik olarak ana veritabanına bağlanır.
+                  Sistem açıldığında bağlantı yoksa otomatik olarak ana veritabanına bağlanır.
               </p>
            </div>
         </div>

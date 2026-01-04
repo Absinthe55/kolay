@@ -24,7 +24,8 @@ export interface Task {
   startedAt?: number;
   completedAt?: number;
   comments?: string;
-  image?: string; // Base64 formatında resim verisi
+  image?: string; // Görev oluşturulurken eklenen resim
+  completedImage?: string; // Görev bitirilirken eklenen resim
 }
 
 export interface User {
