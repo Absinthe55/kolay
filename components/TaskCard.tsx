@@ -14,22 +14,22 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
   const [comment, setComment] = useState('');
   const [completedImage, setCompletedImage] = useState<string | null>(null);
   const [isImageExpanded, setIsImageExpanded] = useState<{url: string, title: string} | null>(null);
-  // Tamamlanmış veya İptal edilmiş görevler varsayılan olarak kapalı gelsin
   const [isCollapsed, setIsCollapsed] = useState(task.status === TaskStatus.COMPLETED || task.status === TaskStatus.CANCELLED);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const statusColors = {
-    [TaskStatus.PENDING]: 'bg-amber-100 text-amber-800 border-amber-200',
-    [TaskStatus.IN_PROGRESS]: 'bg-blue-100 text-blue-800 border-blue-200',
-    [TaskStatus.COMPLETED]: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-    [TaskStatus.CANCELLED]: 'bg-slate-100 text-slate-500 border-slate-200',
+  // Modern Renk Paletleri
+  const statusConfig = {
+    [TaskStatus.PENDING]: { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-100', icon: 'fa-clock', label: 'Beklemede' },
+    [TaskStatus.IN_PROGRESS]: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-100', icon: 'fa-spinner fa-spin', label: 'İşlemde' },
+    [TaskStatus.COMPLETED]: { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100', icon: 'fa-check-circle', label: 'Tamamlandı' },
+    [TaskStatus.CANCELLED]: { bg: 'bg-slate-50', text: 'text-slate-500', border: 'border-slate-100', icon: 'fa-ban', label: 'İptal' },
   };
 
-  const priorityColors = {
-    [TaskPriority.LOW]: 'text-slate-500',
-    [TaskPriority.MEDIUM]: 'text-blue-500',
-    [TaskPriority.HIGH]: 'text-orange-500',
-    [TaskPriority.CRITICAL]: 'text-red-600 font-bold',
+  const priorityConfig = {
+    [TaskPriority.LOW]: { color: 'text-slate-400', bg: 'bg-slate-100' },
+    [TaskPriority.MEDIUM]: { color: 'text-blue-400', bg: 'bg-blue-50' },
+    [TaskPriority.HIGH]: { color: 'text-orange-500', bg: 'bg-orange-50' },
+    [TaskPriority.CRITICAL]: { color: 'text-red-500', bg: 'bg-red-50' },
   };
 
   const formatTime = (timestamp?: number) => {
@@ -45,7 +45,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     
-    if (hours > 0) return `${hours}s ${mins}dk`;
+    if (hours > 0) return `${hours}sa ${mins}dk`;
     return `${mins}dk`;
   };
 
@@ -54,7 +54,6 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
       onUpdateStatus(task.id, TaskStatus.IN_PROGRESS);
     } else if (task.status === TaskStatus.IN_PROGRESS) {
       setShowCommentInput(true);
-      // Formu açtığımızda kartı genişletelim ki rahat görünsün
       setIsCollapsed(false);
     }
   };
@@ -71,7 +70,6 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
     if (onDelete) onDelete(task.id);
   };
 
-  // Tamamlama Resmi İşleme
   const handleCompletedImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -83,20 +81,16 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
       img.onload = () => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        
         const maxWidth = 800;
         let width = img.width;
         let height = img.height;
-
         if (width > maxWidth) {
           height = Math.round((height * maxWidth) / width);
           width = maxWidth;
         }
-
         canvas.width = width;
         canvas.height = height;
         ctx?.drawImage(img, 0, 0, width, height);
-
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
         setCompletedImage(compressedBase64);
         setIsProcessing(false);
@@ -111,213 +105,244 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
     setShowCommentInput(false);
     setComment('');
     setCompletedImage(null);
-    setIsCollapsed(true); // Tamamlanınca kartı kapat
+    setIsCollapsed(true); 
   };
 
   const isCancelled = task.status === TaskStatus.CANCELLED;
+  const currentStatus = statusConfig[task.status];
+  const currentPriority = priorityConfig[task.priority];
 
   return (
     <>
-      <div className={`bg-white rounded-xl shadow-sm border border-slate-200 transition-all hover:shadow-md mb-3 ${isCancelled ? 'opacity-60 grayscale' : ''} ${isCollapsed ? 'overflow-hidden' : 'p-4'}`}>
+      <div className={`bg-white rounded-[1.25rem] shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] transition-all duration-300 hover:shadow-lg border border-slate-100 overflow-hidden relative ${isCancelled ? 'opacity-75 grayscale-[0.8]' : ''}`}>
         
+        {/* Sol Kenar Çizgisi (Renkli Bar) */}
+        <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${currentStatus.bg.replace('bg-', 'bg-').replace('-50', '-400')}`}></div>
+
         {/* Header - Tıklanabilir Alan */}
         <div 
           onClick={() => setIsCollapsed(!isCollapsed)} 
-          className={`flex justify-between items-start cursor-pointer select-none ${isCollapsed ? 'p-3 bg-slate-50' : 'mb-3'}`}
+          className={`relative pl-5 pr-4 py-4 cursor-pointer select-none bg-white`}
         >
-          <div className="flex items-center gap-2 overflow-hidden">
-            <div className={`transition-transform duration-200 ${isCollapsed ? '-rotate-90' : 'rotate-0'}`}>
-               <i className="fas fa-chevron-down text-slate-400 text-xs"></i>
+          <div className="flex justify-between items-start">
+            <div className="flex-1 pr-2">
+               <div className="flex items-center gap-2 mb-1.5">
+                   {/* Status Badge */}
+                   <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide border ${currentStatus.bg} ${currentStatus.text} ${currentStatus.border}`}>
+                       <i className={`fas ${currentStatus.icon}`}></i>
+                       {currentStatus.label}
+                   </span>
+                   {/* Priority Badge */}
+                   <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold ${currentPriority.bg} ${currentPriority.color}`}>
+                       <i className="fas fa-flag"></i>
+                       {task.priority}
+                   </span>
+               </div>
+               
+               <h3 className={`text-lg font-black text-slate-800 leading-tight ${isCancelled ? 'line-through decoration-2 decoration-red-300 text-slate-400' : ''}`}>
+                 {task.machineName}
+               </h3>
+
+               {isCollapsed && (
+                   <p className="text-xs text-slate-500 mt-1 truncate pr-8">{task.description}</p>
+               )}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                 <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${statusColors[task.status]}`}>
-                  {task.status === TaskStatus.PENDING ? 'BEKLİYOR' : 
-                  task.status === TaskStatus.IN_PROGRESS ? 'ÇALIŞILIYOR' : 
-                  task.status === TaskStatus.COMPLETED ? 'TAMAMLANDI' : 'İPTAL EDİLDİ'}
-                </span>
-                {isCollapsed && (
-                    <span className="text-xs font-bold text-slate-700 truncate">{task.machineName}</span>
-                )}
-              </div>
-              {!isCollapsed && (
-                <h3 className={`mt-2 font-bold text-slate-800 text-lg leading-tight ${isCancelled ? 'line-through decoration-2 decoration-red-400' : ''}`}>
-                  {task.machineName}
-                </h3>
-              )}
+
+            {/* Sağ Üst Aksiyonlar */}
+            <div className="flex flex-col items-end gap-2">
+                 {/* Amir Aksiyonları */}
+                 {user.role === 'AMIR' && (
+                     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        {!isCancelled && task.status !== TaskStatus.COMPLETED && (
+                            <button onClick={handleCancelTask} className="w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors" title="İptal Et">
+                                <i className="fas fa-ban text-xs"></i>
+                            </button>
+                        )}
+                        {onDelete && (
+                            <button onClick={handleDeleteTask} className="w-8 h-8 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors" title="Sil">
+                                <i className="fas fa-trash-alt text-xs"></i>
+                            </button>
+                        )}
+                     </div>
+                 )}
+                 
+                 <div className={`transition-transform duration-300 ${isCollapsed ? 'rotate-0' : 'rotate-180'}`}>
+                    <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
+                        <i className="fas fa-chevron-down text-xs"></i>
+                    </div>
+                 </div>
             </div>
           </div>
-
-          <div className="flex flex-col items-end gap-1 min-w-[70px]">
-              <div className={`text-xs flex items-center gap-1 ${priorityColors[task.priority]}`}>
-                  <i className="fas fa-circle text-[8px]"></i>
-                  {task.priority}
+          
+          {/* Usta İsmi ve Tarih (Collapsed) */}
+          {isCollapsed && (
+              <div className="mt-3 flex items-center justify-between border-t border-slate-50 pt-2">
+                  <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                          {task.masterName.substring(0,1)}
+                      </div>
+                      <span className="text-xs font-bold text-slate-600">{task.masterName}</span>
+                  </div>
+                  <span className="text-[10px] font-medium text-slate-400">{new Date(task.createdAt).toLocaleDateString('tr-TR')}</span>
               </div>
-              
-              <div className="flex items-center gap-1 mt-1">
-                 {/* SİLME BUTONU - HER ZAMAN GÖRÜNÜR (AMIR İÇİN) */}
-                 {user.role === 'AMIR' && onDelete && (
-                      <button 
-                          onClick={handleDeleteTask}
-                          className="w-6 h-6 flex items-center justify-center rounded bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors shadow-sm"
-                          title="Görevi Tamamen Sil"
-                      >
-                          <i className="fas fa-trash-alt text-[10px]"></i>
-                      </button>
-                 )}
-
-                 {/* İPTAL BUTONU (Sadece Aktif Görevler İçin) */}
-                 {user.role === 'AMIR' && !isCancelled && task.status !== TaskStatus.COMPLETED && (
-                      <button 
-                          onClick={handleCancelTask}
-                          className="text-[10px] text-red-500 font-bold border border-red-200 px-2 py-0.5 rounded bg-red-50 hover:bg-red-100 transition-colors h-6 flex items-center"
-                          title="Görevi İptal Et"
-                      >
-                          İPTAL
-                      </button>
-                 )}
-              </div>
-
-              {isCollapsed && task.completedAt && (
-                  <span className="text-[10px] text-slate-400 font-mono">{formatTime(task.completedAt)}</span>
-              )}
-          </div>
+          )}
         </div>
 
-        {/* İçerik (Daraltıldığında gizlenir) */}
+        {/* Genişletilmiş İçerik */}
         {!isCollapsed && (
-          <div className="animate-in slide-in-from-top-2 duration-200">
-            <div className="text-sm text-slate-600 mb-3 whitespace-pre-wrap line-clamp-4 leading-relaxed">
+          <div className="pl-5 pr-4 pb-5 animate-in slide-in-from-top-2 duration-300">
+            <div className="bg-slate-50 p-4 rounded-xl text-sm text-slate-600 mb-4 border border-slate-100 leading-relaxed shadow-inner">
+               <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-1">İş Emri Açıklaması</h4>
               {task.description}
             </div>
 
-            {/* Resimler (Görev ve Bitiş Resmi) */}
-            <div className="flex gap-2 overflow-x-auto pb-2 mb-2">
-                {/* Orijinal Görev Resmi */}
+            {/* Resimler */}
+            <div className="flex gap-3 overflow-x-auto pb-2 mb-4">
                 {task.image && (
                   <button 
-                    onClick={() => setIsImageExpanded({url: task.image!, title: 'Görev Resmi'})}
-                    className="relative group w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200"
+                    onClick={() => setIsImageExpanded({url: task.image!, title: 'Arıza Görüntüsü'})}
+                    className="relative group w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden border-2 border-slate-100 shadow-sm hover:border-blue-300 transition-colors"
                   >
                     <img src={task.image} alt="Görev" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <i className="fas fa-search text-white"></i>
+                    <div className="absolute inset-0 bg-blue-900/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <i className="fas fa-search-plus text-white"></i>
                     </div>
-                    <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[8px] p-1 text-center truncate">Arıza</span>
                   </button>
                 )}
-
-                {/* Bitiş Resmi */}
                 {task.completedImage && (
                   <button 
                     onClick={() => setIsImageExpanded({url: task.completedImage!, title: 'Tamamlanan İş'})}
-                    className="relative group w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden border border-emerald-200"
+                    className="relative group w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden border-2 border-emerald-100 shadow-sm hover:border-emerald-300 transition-colors"
                   >
                     <img src={task.completedImage} alt="Bitiş" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute inset-0 bg-emerald-900/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                         <i className="fas fa-check text-white"></i>
                     </div>
-                    <span className="absolute bottom-0 left-0 right-0 bg-emerald-600/80 text-white text-[8px] p-1 text-center truncate">Yapılan İş</span>
                   </button>
                 )}
             </div>
 
-            <div className="flex items-center gap-3 text-xs text-slate-500 mb-3 pb-3 border-b border-slate-100">
-              <span className="flex items-center gap-1">
-                <i className="fas fa-user"></i> {task.masterName}
-              </span>
-              <span className="flex items-center gap-1">
-                <i className="far fa-calendar"></i> {new Date(task.createdAt).toLocaleDateString('tr-TR')}
-              </span>
+            {/* Detay Bilgileri Grid */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="bg-white border border-slate-100 p-2.5 rounded-lg flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400"><i className="fas fa-user text-xs"></i></div>
+                    <div>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase">Görevli</p>
+                        <p className="text-xs font-bold text-slate-700">{task.masterName}</p>
+                    </div>
+                </div>
+                <div className="bg-white border border-slate-100 p-2.5 rounded-lg flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400"><i className="far fa-calendar text-xs"></i></div>
+                    <div>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase">Tarih</p>
+                        <p className="text-xs font-bold text-slate-700">{new Date(task.createdAt).toLocaleDateString('tr-TR')}</p>
+                    </div>
+                </div>
             </div>
 
-            {/* Süre Takip Alanı */}
+            {/* Süreç Takibi (Timeline benzeri) */}
             {(task.startedAt || task.status === TaskStatus.IN_PROGRESS || task.status === TaskStatus.COMPLETED) && !isCancelled && (
-              <div className="grid grid-cols-3 gap-2 mb-3 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                <div className="text-center">
-                    <span className="block text-[9px] text-slate-400 uppercase font-bold">Başlama</span>
-                    <span className="text-xs font-mono font-bold text-slate-700">{formatTime(task.startedAt)}</span>
+              <div className="mb-4 bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center justify-between text-center relative overflow-hidden">
+                <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-200 -z-0"></div>
+                <div className="relative z-10 bg-slate-50 px-2">
+                    <div className="text-[10px] font-bold text-slate-400 mb-1">BAŞLAMA</div>
+                    <div className="inline-block bg-white border border-slate-200 text-slate-700 text-xs font-mono font-bold px-2 py-1 rounded-md shadow-sm">
+                        {formatTime(task.startedAt)}
+                    </div>
                 </div>
-                <div className="text-center border-l border-slate-200 border-r">
-                    <span className="block text-[9px] text-slate-400 uppercase font-bold">Bitiş</span>
-                    <span className="text-xs font-mono font-bold text-slate-700">{task.completedAt ? formatTime(task.completedAt) : '--:--'}</span>
-                </div>
-                <div className="text-center">
-                    <span className="block text-[9px] text-slate-400 uppercase font-bold">Süre</span>
-                    <span className="text-xs font-mono font-bold text-blue-600">{calculateDuration()}</span>
+                 <div className="relative z-10 bg-slate-50 px-2">
+                     <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold shadow-sm ring-4 ring-slate-50">
+                         {calculateDuration()}
+                     </div>
+                 </div>
+                <div className="relative z-10 bg-slate-50 px-2">
+                    <div className="text-[10px] font-bold text-slate-400 mb-1">BİTİŞ</div>
+                    <div className={`inline-block border text-xs font-mono font-bold px-2 py-1 rounded-md shadow-sm ${task.completedAt ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-slate-100 border-slate-200 text-slate-400'}`}>
+                        {task.completedAt ? formatTime(task.completedAt) : '--:--'}
+                    </div>
                 </div>
               </div>
             )}
 
             {task.comments && (
-              <div className="mb-4 p-3 bg-slate-50 rounded-lg border-l-4 border-emerald-400 text-sm italic text-slate-700">
-                <p className="font-bold text-[10px] text-emerald-600 uppercase mb-1">
-                  {isCancelled ? 'İptal Notu:' : 'Usta Raporu:'}
-                </p>
-                "{task.comments}"
+              <div className="mb-5 p-4 bg-emerald-50/50 rounded-xl border border-emerald-100 relative">
+                 <i className="fas fa-quote-left absolute top-3 left-3 text-emerald-200 text-xl"></i>
+                 <div className="relative z-10 pl-6">
+                    <p className="text-[9px] font-black text-emerald-600 uppercase mb-1">
+                    {isCancelled ? 'İPTAL NOTU' : 'USTA RAPORU'}
+                    </p>
+                    <p className="text-sm text-slate-700 italic">"{task.comments}"</p>
+                 </div>
               </div>
             )}
 
+            {/* Aksiyon Butonları */}
             {user.role === 'USTA' && !isCancelled && task.status !== TaskStatus.COMPLETED && (
-              <div className="space-y-3">
+              <div className="pt-2 border-t border-slate-100">
                 {!showCommentInput ? (
                   <button 
                     onClick={handleStatusChange}
-                    className={`w-full py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-transform active:scale-95 ${
+                    className={`w-full py-4 rounded-xl font-black text-sm tracking-wide flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg ${
                       task.status === TaskStatus.PENDING 
-                      ? 'bg-blue-600 text-white shadow-blue-200 shadow-lg' 
-                      : 'bg-emerald-600 text-white shadow-emerald-200 shadow-lg'
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-200 hover:shadow-blue-300' 
+                      : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-emerald-200 hover:shadow-emerald-300'
                     }`}
                   >
-                    <i className={`fas ${task.status === TaskStatus.PENDING ? 'fa-play' : 'fa-check-double'}`}></i>
-                    {task.status === TaskStatus.PENDING ? 'BAŞLA' : 'BİTİR VE ONAYLA'}
+                    <i className={`fas ${task.status === TaskStatus.PENDING ? 'fa-play' : 'fa-clipboard-check'} text-lg`}></i>
+                    {task.status === TaskStatus.PENDING ? 'İŞE BAŞLA' : 'GÖREVİ TAMAMLA'}
                   </button>
                 ) : (
-                  <div className="animate-in fade-in slide-in-from-bottom-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Tamamlama Raporu</h4>
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 animate-in fade-in zoom-in-95 duration-200">
+                    <h4 className="text-sm font-black text-slate-700 mb-3 flex items-center gap-2">
+                        <i className="fas fa-file-signature text-emerald-500"></i>
+                        Tamamlama Raporu
+                    </h4>
                     
                     <textarea 
-                      className="w-full border border-slate-300 rounded-lg p-2 text-sm mb-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm mb-4 focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all placeholder:text-slate-400"
                       rows={3}
-                      placeholder="Yapılan işlemleri detaylı yazınız..."
+                      placeholder="Yapılan işlemleri detaylıca yazınız..."
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
                     ></textarea>
 
-                    <div className="mb-3">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                            <i className="fas fa-camera"></i> Fotoğraf Ekle
+                    <div className="mb-4">
+                        <label className="flex items-center gap-3 p-3 rounded-xl border border-dashed border-slate-300 hover:border-emerald-400 hover:bg-emerald-50 transition-colors cursor-pointer group">
+                             <div className="w-10 h-10 rounded-full bg-slate-100 group-hover:bg-emerald-100 flex items-center justify-center text-slate-400 group-hover:text-emerald-500 transition-colors">
+                                 <i className="fas fa-camera"></i>
+                             </div>
+                             <div className="flex-1">
+                                 <span className="block text-xs font-bold text-slate-600 group-hover:text-emerald-700">Fotoğraf Ekle</span>
+                                 <span className="block text-[10px] text-slate-400">Yapılan işin fotoğrafı</span>
+                             </div>
+                             <input type="file" accept="image/*" onChange={handleCompletedImageChange} className="hidden" />
                         </label>
-                        <input 
-                            type="file" 
-                            accept="image/*"
-                            onChange={handleCompletedImageChange}
-                            className="block w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
-                        />
-                        {isProcessing && <p className="text-[10px] text-blue-500 mt-1">Fotoğraf işleniyor...</p>}
+
+                        {isProcessing && <p className="text-xs text-blue-500 mt-2 font-bold animate-pulse">Fotoğraf işleniyor...</p>}
+                        
                         {completedImage && (
-                            <div className="mt-2 relative inline-block">
-                                <img src={completedImage} alt="Önizleme" className="h-16 rounded border border-slate-300" />
-                                <button onClick={() => setCompletedImage(null)} className="absolute -top-1 -right-1 bg-red-500 text-white w-4 h-4 rounded-full text-[10px] flex items-center justify-center">
+                            <div className="mt-3 relative w-full h-32 rounded-xl overflow-hidden shadow-md">
+                                <img src={completedImage} alt="Önizleme" className="w-full h-full object-cover" />
+                                <button onClick={() => setCompletedImage(null)} className="absolute top-2 right-2 bg-black/50 hover:bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm transition-colors">
                                     <i className="fas fa-times"></i>
                                 </button>
                             </div>
                         )}
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-3">
                       <button 
                         onClick={() => { setShowCommentInput(false); setComment(''); setCompletedImage(null); }}
-                        className="flex-1 py-2 bg-white border border-slate-300 text-slate-600 rounded-lg font-bold text-sm hover:bg-slate-50"
+                        className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs hover:bg-slate-200 transition-colors"
                       >
-                        İPTAL
+                        VAZGEÇ
                       </button>
                       <button 
                         onClick={submitCompletion}
                         disabled={!comment.trim() || isProcessing}
-                        className="flex-1 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm shadow-emerald-200 shadow-md hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-[2] py-3 bg-emerald-600 text-white rounded-xl font-bold text-xs shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       >
-                        ONAYLA
+                        ONAYLA VE BİTİR
                       </button>
                     </div>
                   </div>
@@ -330,15 +355,17 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
         {/* Resim Büyütme Modalı */}
         {isImageExpanded && (
             <div 
-                className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"
+                className="fixed inset-0 bg-slate-900/95 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200"
                 onClick={() => setIsImageExpanded(null)}
             >
-                <div className="max-w-full max-h-full flex flex-col items-center">
-                    <img src={isImageExpanded.url} alt="Büyük" className="max-w-full max-h-[80vh] object-contain rounded-lg" />
-                    <p className="text-white mt-4 font-bold text-lg">{isImageExpanded.title}</p>
-                    <button className="mt-4 bg-white/20 text-white px-6 py-2 rounded-full backdrop-blur-sm border border-white/30">
-                        Kapat
+                <div className="relative w-full max-w-lg flex flex-col items-center" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => setIsImageExpanded(null)} className="absolute -top-12 right-0 text-white/70 hover:text-white text-3xl">
+                        <i className="fas fa-times-circle"></i>
                     </button>
+                    <img src={isImageExpanded.url} alt="Büyük" className="w-full rounded-2xl shadow-2xl object-contain max-h-[70vh] bg-black" />
+                    <div className="mt-6 bg-white/10 backdrop-blur-md px-6 py-2 rounded-full border border-white/20">
+                        <p className="text-white font-bold">{isImageExpanded.title}</p>
+                    </div>
                 </div>
             </div>
         )}

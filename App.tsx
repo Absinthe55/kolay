@@ -53,7 +53,7 @@ const App: React.FC = () => {
     // 1. İlk açılışta veri yükle
     loadData();
 
-    // 2. Anında otomatik bağlantı kontrolü (Gecikme kaldırıldı)
+    // 2. Anında otomatik bağlantı kontrolü
     const initAutoConnect = async () => {
        const currentId = getStoredBinId();
        if (!currentId) {
@@ -63,12 +63,10 @@ const App: React.FC = () => {
           if (isValid) {
              setStoredBinId(autoId);
              setConnectionId(autoId);
-             // ID set edildikten sonra loadData connectionId değişimini yakalayamaz (closure), manuel çağır
              const data = await fetchAppData(autoId);
              setTasks(data.tasks);
              if (data.amirs.length > 0) setAmirList(data.amirs);
              if (data.ustas.length > 0) setUstaList(data.ustas);
-             // alert("✅ Sisteme otomatik olarak bağlandınız!"); // Kullanıcıyı rahatsız etmemek için alert kaldırıldı
           }
        }
     };
@@ -110,7 +108,6 @@ const App: React.FC = () => {
       loadData(newId);
       alert("✅ BAŞARILI!\n\nKod: " + newId);
     } else {
-      // MANUEL GİRİŞ
       const manualInput = prompt(
         "⚠ OTOMATİK OLUŞTURULAMADI\n\n" +
         "Lütfen 'npoint.io' sitesinden aldığınız kodu (veya linki) yapıştırın:"
@@ -153,7 +150,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Personel Ekleme (Sadece ERKAN ÇİLİNGİR)
   const handleAddMember = async () => {
     if (!newMemberName.trim()) return;
     
@@ -175,7 +171,6 @@ const App: React.FC = () => {
     alert(`${newMemberName} listeye eklendi.`);
   };
 
-  // Personel Çıkarma (Sadece ERKAN ÇİLİNGİR)
   const handleRemoveMember = async (name: string, role: 'AMIR' | 'USTA') => {
       if(!confirm(`${name} kullanıcısını silmek istediğinize emin misiniz?`)) return;
 
@@ -195,7 +190,6 @@ const App: React.FC = () => {
       setLoading(false);
   };
 
-  // Resim sıkıştırma ve işleme
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -208,7 +202,6 @@ const App: React.FC = () => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // Boyutlandırma (Max genişlik 800px)
         const maxWidth = 800;
         let width = img.width;
         let height = img.height;
@@ -222,7 +215,6 @@ const App: React.FC = () => {
         canvas.height = height;
         ctx?.drawImage(img, 0, 0, width, height);
 
-        // JPEG olarak sıkıştır (Kalite 0.7)
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
         setNewTaskImage(compressedBase64);
         setLoading(false);
@@ -263,7 +255,6 @@ const App: React.FC = () => {
     setActiveTab('tasks');
   };
 
-  // Status güncelleme fonksiyonu (artık completedImage de alıyor)
   const updateTaskStatus = async (taskId: string, newStatus: TaskStatus, comment?: string, completedImage?: string) => {
     setLoading(true);
     const now = Date.now();
@@ -276,7 +267,7 @@ const App: React.FC = () => {
               comments: comment || t.comments,
               startedAt: newStatus === TaskStatus.IN_PROGRESS ? (t.startedAt || now) : t.startedAt,
               completedAt: newStatus === TaskStatus.COMPLETED ? now : t.completedAt,
-              completedImage: completedImage || t.completedImage // Bitiş resmi varsa kaydet
+              completedImage: completedImage || t.completedImage
             };
         }
         return t;
@@ -287,7 +278,6 @@ const App: React.FC = () => {
     setLoading(false);
   };
 
-  // Görev Silme Fonksiyonu
   const handleDeleteTask = async (taskId: string) => {
     if (!confirm("BU GÖREV KALICI OLARAK SİLİNECEK.\n\nEmin misiniz?")) return;
 
@@ -300,39 +290,58 @@ const App: React.FC = () => {
 
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-start p-6 text-white overflow-y-auto pb-12">
-        <div className="w-full max-w-md">
-          <div className="flex flex-col items-center mt-8 mb-10">
-            <div className="bg-blue-600 p-5 rounded-3xl shadow-2xl shadow-blue-900/40 mb-6">
-              <i className="fas fa-oil-can text-5xl text-white"></i>
+      <div className="min-h-screen bg-slate-900 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-6 text-white overflow-y-auto">
+        <div className="w-full max-w-sm animate-in zoom-in duration-500">
+          <div className="flex flex-col items-center mb-10">
+            <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-6 rounded-[2rem] shadow-[0_0_40px_rgba(37,99,235,0.3)] mb-6 ring-4 ring-white/10">
+              <i className="fas fa-oil-can text-5xl text-white drop-shadow-md"></i>
             </div>
-            <h1 className="text-3xl font-bold tracking-tighter">HidroGörev</h1>
-            <p className="text-slate-400 mt-2 text-center text-sm font-medium">Hidrolik Bakım Takip</p>
+            <h1 className="text-4xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-white">HidroGörev</h1>
+            <p className="text-slate-400 mt-2 text-center text-sm font-medium tracking-wide">Fabrika Hidrolik Takip Sistemi</p>
           </div>
-          <div className="space-y-6">
+          
+          <div className="space-y-6 bg-white/5 backdrop-blur-lg p-6 rounded-3xl border border-white/10 shadow-2xl">
             <section>
-              <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 ml-1">Amir Girişi</h2>
-              <div className="grid grid-cols-1 gap-3">
+              <div className="flex items-center gap-2 mb-3">
+                 <div className="w-1 h-4 bg-blue-500 rounded-full"></div>
+                 <h2 className="text-xs font-bold text-blue-200 uppercase tracking-widest">Yönetim</h2>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
                 {amirList.map(name => (
-                  <button key={name} onClick={() => handleLogin(name, 'AMIR')} className="bg-slate-800 border border-slate-700 p-4 rounded-xl text-left font-bold hover:bg-slate-700 flex justify-between items-center group">
-                    <span className="text-blue-400 group-hover:text-white transition-colors">{name}</span>
-                    <i className="fas fa-chevron-right text-slate-600"></i>
+                  <button key={name} onClick={() => handleLogin(name, 'AMIR')} className="group relative bg-slate-800/50 hover:bg-blue-600 border border-white/5 p-4 rounded-2xl text-left font-bold transition-all duration-300 flex justify-between items-center overflow-hidden">
+                    <div className="absolute inset-0 bg-blue-400/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
+                    <span className="text-slate-200 group-hover:text-white relative z-10 flex items-center gap-3">
+                        <i className="fas fa-user-tie text-blue-400 group-hover:text-white/80"></i>
+                        {name}
+                    </span>
+                    <i className="fas fa-arrow-right text-slate-600 group-hover:text-white relative z-10 opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0"></i>
                   </button>
                 ))}
               </div>
             </section>
+            
+            <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+
             <section>
-              <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 ml-1">Usta Girişi</h2>
-              <div className="grid grid-cols-1 gap-3">
+              <div className="flex items-center gap-2 mb-3">
+                 <div className="w-1 h-4 bg-emerald-500 rounded-full"></div>
+                 <h2 className="text-xs font-bold text-emerald-200 uppercase tracking-widest">Saha Ekibi</h2>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
                 {ustaList.map(name => (
-                  <button key={name} onClick={() => handleLogin(name, 'USTA')} className="bg-slate-800 border border-slate-700 p-4 rounded-xl text-left font-bold hover:bg-slate-700 flex justify-between items-center group">
-                    <span className="text-emerald-400 group-hover:text-white transition-colors">{name}</span>
-                    <i className="fas fa-chevron-right text-slate-600"></i>
+                  <button key={name} onClick={() => handleLogin(name, 'USTA')} className="group relative bg-slate-800/50 hover:bg-emerald-600 border border-white/5 p-4 rounded-2xl text-left font-bold transition-all duration-300 flex justify-between items-center overflow-hidden">
+                    <div className="absolute inset-0 bg-emerald-400/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
+                    <span className="text-slate-200 group-hover:text-white relative z-10 flex items-center gap-3">
+                        <i className="fas fa-wrench text-emerald-400 group-hover:text-white/80"></i>
+                        {name}
+                    </span>
+                    <i className="fas fa-arrow-right text-slate-600 group-hover:text-white relative z-10 opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0"></i>
                   </button>
                 ))}
               </div>
             </section>
           </div>
+          <p className="text-center text-[10px] text-slate-600 mt-6 font-mono">v1.2 &bull; Güvenli Bağlantı</p>
         </div>
       </div>
     );
@@ -346,31 +355,36 @@ const App: React.FC = () => {
 
   return (
     <Layout user={currentUser} onLogout={() => setCurrentUser(null)} activeTab={activeTab} setActiveTab={setActiveTab}>
-      <div className={`px-4 py-3 mb-4 rounded-lg text-xs font-bold flex justify-between items-center shadow-sm ${connectionId ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
-        <span className="flex items-center gap-2">
-           <i className={`fas ${connectionId ? 'fa-link' : 'fa-wifi-slash'}`}></i>
-           {connectionId ? 'Canlı Bağlantı' : 'Yerel Mod'}
+      <div className={`px-4 py-2 mb-6 rounded-full text-[10px] font-bold flex justify-center items-center shadow-sm mx-auto w-fit transition-colors ${connectionId ? 'bg-emerald-100/50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
+        <span className="flex items-center gap-1.5">
+           <span className={`w-2 h-2 rounded-full ${connectionId ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
+           {connectionId ? 'Canlı Senkronizasyon Aktif' : 'Çevrimdışı / Yerel Mod'}
         </span>
-        {connectionId && <span className="font-mono bg-white px-2 py-0.5 rounded border border-emerald-200 opacity-80 text-[10px]">{connectionId.substring(0,6)}...</span>}
       </div>
 
       {activeTab === 'tasks' && (
-        <div className="animate-in fade-in duration-500">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight">İş Listesi</h2>
-            <button onClick={() => loadData()} disabled={loading} className={`w-10 h-10 rounded-full flex items-center justify-center bg-white border border-slate-200 text-blue-600 shadow-sm ${loading ? 'animate-spin' : ''}`}>
-              <i className="fas fa-sync-alt"></i>
+        <div className="animate-in fade-in duration-500 pb-24">
+          <div className="flex justify-between items-end mb-8 px-1">
+            <div>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Hoş Geldiniz,</p>
+                <h2 className="text-3xl font-black text-slate-800 tracking-tight leading-none">{currentUser.name.split(' ')[0]} Bey</h2>
+            </div>
+            <button onClick={() => loadData()} disabled={loading} className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-white border border-slate-100 text-blue-600 shadow-lg shadow-blue-100 hover:shadow-xl hover:-translate-y-1 transition-all active:scale-95 ${loading ? 'animate-spin bg-blue-50' : ''}`}>
+              <i className="fas fa-sync-alt text-lg"></i>
             </button>
           </div>
 
           {filteredTasks.length === 0 ? (
-            <div className="py-20 text-center text-slate-400">
-              <i className="fas fa-clipboard-list text-5xl mb-4 opacity-20"></i>
-              <p>Aktif görev bulunmuyor.</p>
-              {!connectionId && <p className="text-xs text-orange-400 mt-2">Otomatik bağlanılıyor...</p>}
+            <div className="flex flex-col items-center justify-center py-24 text-center px-6 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
+              <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                  <i className="fas fa-clipboard-check text-4xl text-slate-300"></i>
+              </div>
+              <h3 className="text-lg font-bold text-slate-700">Her şey yolunda!</h3>
+              <p className="text-slate-400 text-sm mt-1 max-w-[200px]">Şu anda listede bekleyen veya aktif bir görev bulunmuyor.</p>
+              {!connectionId && <p className="text-xs text-orange-400 mt-4 bg-orange-50 px-3 py-1 rounded-full font-bold">Bağlantı aranıyor...</p>}
             </div>
           ) : (
-            <div className="space-y-4 pb-20">
+            <div className="space-y-5">
               {filteredTasks.map(task => (
                 <TaskCard 
                   key={task.id} 
@@ -386,45 +400,56 @@ const App: React.FC = () => {
       )}
 
       {activeTab === 'add' && currentUser.role === 'AMIR' && (
-        <div className="animate-in slide-in-from-right duration-300">
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-6">Görev Ver</h2>
-          <form onSubmit={handleCreateTask} className="space-y-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="animate-in slide-in-from-right duration-300 pb-24">
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-6 px-1">Yeni Görev</h2>
+          <form onSubmit={handleCreateTask} className="space-y-5 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative overflow-hidden">
+             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
             {!connectionId && (
-                <div className="bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl text-xs font-bold flex items-center gap-2">
-                    <i className="fas fa-exclamation-triangle"></i>
-                    Yerel moddasınız. Veriler senkronize olmayabilir.
+                <div className="bg-orange-50 border border-orange-200 text-orange-800 p-4 rounded-xl text-xs font-bold flex items-center gap-3">
+                    <i className="fas fa-wifi-slash text-lg"></i>
+                    Yerel moddasınız. Veriler diğer cihazlara gitmeyebilir.
                 </div>
             )}
             <div>
-                <label className="text-xs font-bold text-slate-500 uppercase">Makine</label>
-                <input type="text" className="w-full border border-slate-200 rounded-xl p-3 mt-1 bg-slate-50" value={newTaskMachine} onChange={e => setNewTaskMachine(e.target.value)} required placeholder="Örn: Pres 4" />
-            </div>
-            <div>
-                <label className="text-xs font-bold text-slate-500 uppercase">Usta</label>
-                <select className="w-full border border-slate-200 rounded-xl p-3 mt-1 bg-slate-50" value={newTaskMaster} onChange={e => setNewTaskMaster(e.target.value)} required>
-                    <option value="">Seçiniz...</option>
-                    {ustaList.map(u => <option key={u} value={u}>{u}</option>)}
-                </select>
-            </div>
-            <div>
-                <label className="text-xs font-bold text-slate-500 uppercase">Öncelik</label>
-                <div className="flex gap-2 mt-1">
-                    {Object.values(TaskPriority).map(p => (
-                        <button key={p} type="button" onClick={() => setNewTaskPriority(p)} className={`flex-1 py-2 rounded-lg text-xs font-bold border ${newTaskPriority === p ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-200'}`}>{p}</button>
-                    ))}
-                </div>
-            </div>
-            <div>
-                <label className="text-xs font-bold text-slate-500 uppercase">Açıklama</label>
-                <textarea className="w-full border border-slate-200 rounded-xl p-3 mt-1 bg-slate-50 h-24" value={newTaskDescription} onChange={e => setNewTaskDescription(e.target.value)} required placeholder="İş emri detayı..." />
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Makine Adı</label>
+                <input type="text" className="w-full border-0 bg-slate-50 ring-1 ring-slate-200 rounded-2xl p-4 text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all outline-none placeholder:font-normal" value={newTaskMachine} onChange={e => setNewTaskMachine(e.target.value)} required placeholder="Örn: Enjeksiyon 3" />
             </div>
             
-            {/* Fotoğraf Ekleme Alanı */}
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Görevli Usta</label>
+                    <div className="relative">
+                        <select className="w-full appearance-none border-0 bg-slate-50 ring-1 ring-slate-200 rounded-2xl p-4 text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all outline-none" value={newTaskMaster} onChange={e => setNewTaskMaster(e.target.value)} required>
+                            <option value="">Seçiniz...</option>
+                            {ustaList.map(u => <option key={u} value={u}>{u}</option>)}
+                        </select>
+                        <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                    </div>
+                </div>
+                 <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Öncelik</label>
+                    <div className="relative">
+                        <select className="w-full appearance-none border-0 bg-slate-50 ring-1 ring-slate-200 rounded-2xl p-4 text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all outline-none" value={newTaskPriority} onChange={e => setNewTaskPriority(e.target.value as TaskPriority)}>
+                             {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                         <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                    </div>
+                </div>
+            </div>
+
             <div>
-                <label className="text-xs font-bold text-slate-500 uppercase">Fotoğraf Ekle (İsteğe Bağlı)</label>
-                <div className="mt-1 flex items-center gap-4">
-                  <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-3 rounded-xl border border-slate-300 flex items-center gap-2 text-sm font-bold transition-colors">
-                    <i className="fas fa-camera"></i> Fotoğraf Seç
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1 mb-1 block">İş Emri Detayı</label>
+                <textarea className="w-full border-0 bg-slate-50 ring-1 ring-slate-200 rounded-2xl p-4 text-slate-800 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all outline-none min-h-[120px] resize-none" value={newTaskDescription} onChange={e => setNewTaskDescription(e.target.value)} required placeholder="Yapılacak işlemi detaylıca tarif ediniz..." />
+            </div>
+            
+            <div>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Fotoğraf (Opsiyonel)</label>
+                <div className="flex items-center gap-4">
+                  <label className="flex-1 cursor-pointer bg-slate-50 hover:bg-slate-100 text-slate-500 py-4 rounded-2xl ring-1 ring-slate-200 ring-dashed border-2 border-transparent hover:border-blue-300 flex flex-col items-center justify-center gap-2 transition-all group">
+                    <div className="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i className="fas fa-camera text-blue-500 text-lg"></i>
+                    </div>
+                    <span className="text-xs font-bold">Fotoğraf Çek / Yükle</span>
                     <input 
                       type="file" 
                       accept="image/*" 
@@ -434,54 +459,64 @@ const App: React.FC = () => {
                     />
                   </label>
                   {newTaskImage && (
-                    <div className="relative group">
-                      <img src={newTaskImage} alt="Önizleme" className="w-12 h-12 rounded-lg object-cover border border-slate-200 shadow-sm" />
+                    <div className="relative w-24 h-24 rounded-2xl overflow-hidden shadow-lg ring-2 ring-white">
+                      <img src={newTaskImage} alt="Önizleme" className="w-full h-full object-cover" />
                       <button 
                         type="button" 
                         onClick={() => { setNewTaskImage(null); if(fileInputRef.current) fileInputRef.current.value = ''; }}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs shadow-md"
+                        className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md hover:bg-red-600"
                       >
                         <i className="fas fa-times"></i>
                       </button>
                     </div>
                   )}
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1 pl-1">* Resimler otomatik olarak küçültülecektir.</p>
             </div>
 
-            <button disabled={loading} className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition-all">
-                {loading ? 'Gönderiliyor...' : 'GÖREVİ YAYINLA'}
+            <button disabled={loading} className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-blue-200 hover:shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
+                {loading ? (
+                    <>
+                    <i className="fas fa-circle-notch animate-spin"></i>
+                    <span>İLETİLİYOR...</span>
+                    </>
+                ) : (
+                    <>
+                    <span>GÖREVİ YAYINLA</span>
+                    <i className="fas fa-paper-plane"></i>
+                    </>
+                )}
             </button>
           </form>
         </div>
       )}
 
       {activeTab === 'profile' && (
-        <div className="animate-in slide-in-from-left duration-300 pb-20">
-           <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-6">Ayarlar</h2>
+        <div className="animate-in slide-in-from-left duration-300 pb-24">
+           <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-6 px-1">Ayarlar</h2>
            
-           {/* Personel Yönetimi - Sadece Erkan Çilingir */}
            {isErkan && (
-               <div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-6 rounded-2xl border border-blue-100 shadow-sm mb-6 relative overflow-hidden">
-                   <div className="absolute top-0 right-0 p-4 opacity-10"><i className="fas fa-users-cog text-6xl text-blue-800"></i></div>
-                   <h3 className="font-bold text-blue-900 mb-4 flex items-center gap-2 text-lg">
-                       <i className="fas fa-user-shield"></i> Personel Yönetimi
+               <div className="bg-white p-6 rounded-[2rem] border border-blue-100 shadow-xl shadow-blue-50 mb-6 relative overflow-hidden group">
+                   <div className="absolute top-0 right-0 p-0 opacity-5 group-hover:opacity-10 transition-opacity"><i className="fas fa-users-cog text-[150px] text-blue-800 -mr-10 -mt-10"></i></div>
+                   <h3 className="font-black text-slate-800 mb-6 flex items-center gap-3 text-lg relative z-10">
+                       <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
+                           <i className="fas fa-user-shield"></i>
+                       </div>
+                       Personel Yönetimi
                    </h3>
                    
-                   {/* Ekleme Formu */}
-                   <div className="bg-white/60 p-4 rounded-xl mb-4 border border-blue-100 backdrop-blur-sm">
-                       <p className="text-xs font-bold text-blue-400 uppercase mb-2">Yeni Personel Ekle</p>
-                       <div className="flex flex-col gap-2">
+                   <div className="bg-slate-50 p-4 rounded-2xl mb-6 ring-1 ring-slate-100">
+                       <p className="text-xs font-bold text-slate-400 uppercase mb-3 ml-1">Hızlı Ekle</p>
+                       <div className="flex flex-col gap-3">
                            <input 
                                type="text" 
-                               placeholder="Ad Soyad (Örn: Usta Ali)" 
-                               className="p-3 rounded-lg border border-blue-100 text-sm w-full"
+                               placeholder="Ad Soyad" 
+                               className="p-3.5 rounded-xl border-0 bg-white ring-1 ring-slate-200 text-sm w-full font-bold focus:ring-2 focus:ring-blue-500 outline-none"
                                value={newMemberName}
                                onChange={(e) => setNewMemberName(e.target.value)}
                            />
                            <div className="flex gap-2">
                                <select 
-                                   className="p-3 rounded-lg border border-blue-100 text-sm bg-white"
+                                   className="p-3.5 rounded-xl border-0 bg-white ring-1 ring-slate-200 text-sm font-bold outline-none"
                                    value={newMemberRole}
                                    onChange={(e) => setNewMemberRole(e.target.value as any)}
                                >
@@ -490,25 +525,24 @@ const App: React.FC = () => {
                                </select>
                                <button 
                                    onClick={handleAddMember}
-                                   className="flex-1 bg-blue-600 text-white rounded-lg font-bold text-sm shadow-md hover:bg-blue-700"
+                                   className="flex-1 bg-blue-600 text-white rounded-xl font-bold text-sm shadow-lg hover:bg-blue-700 active:scale-95 transition-all"
                                >
-                                   EKLE
+                                   KAYDET
                                </button>
                            </div>
                        </div>
                    </div>
 
-                   {/* Listeleme ve Silme */}
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
                        <div>
-                           <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Amirler</h4>
-                           <ul className="space-y-1">
+                           <h4 className="text-xs font-bold text-blue-500 uppercase mb-3 pl-1">Amir Kadrosu</h4>
+                           <ul className="space-y-2">
                                {amirList.map(name => (
-                                   <li key={name} className="flex justify-between items-center bg-white p-2 rounded border border-slate-100 text-xs font-bold text-slate-700">
-                                       {name}
+                                   <li key={name} className="flex justify-between items-center bg-white p-3 rounded-xl ring-1 ring-slate-100 text-xs font-bold text-slate-700 shadow-sm">
+                                       <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-400"></div> {name}</span>
                                        {name !== currentUser.name && (
-                                           <button onClick={() => handleRemoveMember(name, 'AMIR')} className="text-red-400 hover:text-red-600 px-2">
-                                               <i className="fas fa-trash"></i>
+                                           <button onClick={() => handleRemoveMember(name, 'AMIR')} className="w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center">
+                                               <i className="fas fa-trash-alt text-[10px]"></i>
                                            </button>
                                        )}
                                    </li>
@@ -516,13 +550,13 @@ const App: React.FC = () => {
                            </ul>
                        </div>
                        <div>
-                           <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Ustalar</h4>
-                           <ul className="space-y-1">
+                           <h4 className="text-xs font-bold text-emerald-500 uppercase mb-3 pl-1">Usta Kadrosu</h4>
+                           <ul className="space-y-2">
                                {ustaList.map(name => (
-                                   <li key={name} className="flex justify-between items-center bg-white p-2 rounded border border-slate-100 text-xs font-bold text-slate-700">
-                                       {name}
-                                       <button onClick={() => handleRemoveMember(name, 'USTA')} className="text-red-400 hover:text-red-600 px-2">
-                                           <i className="fas fa-trash"></i>
+                                   <li key={name} className="flex justify-between items-center bg-white p-3 rounded-xl ring-1 ring-slate-100 text-xs font-bold text-slate-700 shadow-sm">
+                                       <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-400"></div> {name}</span>
+                                       <button onClick={() => handleRemoveMember(name, 'USTA')} className="w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center">
+                                           <i className="fas fa-trash-alt text-[10px]"></i>
                                        </button>
                                    </li>
                                ))}
@@ -532,35 +566,23 @@ const App: React.FC = () => {
                </div>
            )}
 
-           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+           <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 space-y-6">
               <div className="text-center">
-                 <p className="text-xs font-bold text-slate-400 uppercase mb-2">Mevcut Bağlantı Kodu</p>
-                 <div className={`text-xl font-mono font-bold tracking-widest py-4 rounded-xl border select-all break-all px-2 ${connectionId ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
+                 <p className="text-xs font-bold text-slate-400 uppercase mb-3">Bulut Bağlantı ID</p>
+                 <div className={`text-xl font-mono font-bold tracking-widest py-5 rounded-2xl border-2 border-dashed select-all break-all px-4 ${connectionId ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
                     {connectionId || "BAĞLANTI YOK"}
                  </div>
               </div>
-              <div className="grid grid-cols-1 gap-3">
-                 <button onClick={handleCreateConnection} className="bg-blue-600 text-white py-4 rounded-xl font-bold text-sm shadow-blue-200 shadow-lg active:scale-95 transition-transform">
-                    <i className="fas fa-satellite-dish mr-2"></i>
+              <div className="grid grid-cols-1 gap-4">
+                 <button onClick={handleCreateConnection} className="bg-slate-800 text-white py-4 rounded-xl font-bold text-sm shadow-lg hover:bg-slate-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+                    <i className="fas fa-magic"></i>
                     YENİ KOD OLUŞTUR
                  </button>
-                 <button onClick={handleJoinConnection} className="bg-white text-slate-700 py-4 rounded-xl font-bold text-sm border border-slate-200 active:scale-95 transition-transform">
-                    <i className="fas fa-keyboard mr-2"></i>
+                 <button onClick={handleJoinConnection} className="bg-white text-slate-700 py-4 rounded-xl font-bold text-sm border-2 border-slate-100 hover:border-slate-300 hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center gap-2">
+                    <i className="fas fa-link"></i>
                     MEVCUT KODU GİR
                  </button>
               </div>
-              <div className="text-center mt-2">
-                 <a href="https://npoint.io" target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 underline">
-                    Kod oluşturamıyorsanız buraya tıklayın (npoint.io)
-                 </a>
-              </div>
-           </div>
-           
-           <div className="mt-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <h3 className="font-bold text-slate-700 mb-2 text-xs uppercase flex items-center gap-2"><i className="fas fa-info-circle"></i> Otomatik Bağlantı</h3>
-              <p className="text-xs text-slate-600">
-                  Sistem açıldığında bağlantı yoksa otomatik olarak ana veritabanına bağlanır.
-              </p>
            </div>
         </div>
       )}
