@@ -431,14 +431,14 @@ const App: React.FC = () => {
         {/* Login Password Modal */}
         {loginModal && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                <div className="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl scale-100 animate-in zoom-in-95 duration-200 relative overflow-hidden">
+                <div className="bg-slate-800 rounded-3xl p-6 w-full max-w-xs shadow-2xl scale-100 animate-in zoom-in-95 duration-200 relative overflow-hidden border border-slate-700">
                      <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
                     <div className="text-center mb-6">
-                        <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner">
+                        <div className="w-16 h-16 bg-blue-900/30 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner border border-blue-800/30">
                             <i className="fas fa-lock text-2xl"></i>
                         </div>
-                        <h3 className="text-lg font-black text-slate-800">Şifre Giriniz</h3>
-                        <p className="text-sm text-slate-500 font-medium">{loginModal.member?.name}</p>
+                        <h3 className="text-lg font-black text-slate-100">Şifre Giriniz</h3>
+                        <p className="text-sm text-slate-400 font-medium">{loginModal.member?.name}</p>
                     </div>
 
                     <form onSubmit={handleLoginSubmit}>
@@ -446,17 +446,17 @@ const App: React.FC = () => {
                             type="password" 
                             autoFocus
                             placeholder="****" 
-                            className={`w-full text-center text-2xl tracking-widest font-bold p-4 rounded-2xl bg-slate-50 border-2 outline-none transition-all mb-2 ${loginError ? 'border-red-400 bg-red-50 text-red-600' : 'border-slate-200 focus:border-blue-500 focus:bg-white'}`}
+                            className={`w-full text-center text-2xl tracking-widest font-bold p-4 rounded-2xl bg-slate-900 border-2 outline-none transition-all mb-2 text-white placeholder:text-slate-600 ${loginError ? 'border-red-500 bg-red-900/20 text-red-200' : 'border-slate-700 focus:border-blue-500'}`}
                             value={loginPasswordInput}
                             onChange={(e) => setLoginPasswordInput(e.target.value)}
                         />
-                        {loginError && <p className="text-center text-xs font-bold text-red-500 mb-4 animate-pulse">Hatalı şifre, tekrar deneyin.</p>}
+                        {loginError && <p className="text-center text-xs font-bold text-red-400 mb-4 animate-pulse">Hatalı şifre, tekrar deneyin.</p>}
 
                         <div className="grid grid-cols-2 gap-3 mt-4">
-                            <button type="button" onClick={() => { setLoginModal(null); setLoginError(false); }} className="py-3 rounded-xl font-bold text-sm text-slate-500 bg-slate-100 hover:bg-slate-200">
+                            <button type="button" onClick={() => { setLoginModal(null); setLoginError(false); }} className="py-3 rounded-xl font-bold text-sm text-slate-400 bg-slate-700 hover:bg-slate-600 hover:text-white transition-colors">
                                 Vazgeç
                             </button>
-                            <button type="submit" className="py-3 rounded-xl font-bold text-sm text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200">
+                            <button type="submit" className="py-3 rounded-xl font-bold text-sm text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-900/50">
                                 Giriş Yap
                             </button>
                         </div>
@@ -476,9 +476,9 @@ const App: React.FC = () => {
 
   return (
     <Layout user={currentUser} onLogout={() => setCurrentUser(null)} activeTab={activeTab} setActiveTab={setActiveTab}>
-      <div className={`px-4 py-2 mb-6 rounded-full text-[10px] font-bold flex justify-center items-center shadow-sm mx-auto w-fit transition-colors ${connectionId ? 'bg-emerald-100/50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
+      <div className={`px-4 py-2 mb-6 rounded-full text-[10px] font-bold flex justify-center items-center shadow-sm mx-auto w-fit transition-colors ${connectionId ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-800/50' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
         <span className="flex items-center gap-1.5">
-           <span className={`w-2 h-2 rounded-full ${connectionId ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
+           <span className={`w-2 h-2 rounded-full ${connectionId ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`}></span>
            {connectionId ? 'Canlı Senkronizasyon Aktif' : 'Çevrimdışı / Yerel Mod'}
         </span>
       </div>
@@ -487,22 +487,22 @@ const App: React.FC = () => {
         <div className="animate-in fade-in duration-500 pb-24">
           <div className="flex justify-between items-end mb-8 px-1">
             <div>
-                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Hoş Geldiniz,</p>
-                <h2 className="text-3xl font-black text-slate-800 tracking-tight leading-none">{currentUser.name.split(' ')[0]} Bey</h2>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Hoş Geldiniz,</p>
+                <h2 className="text-3xl font-black text-slate-100 tracking-tight leading-none">{currentUser.name.split(' ')[0]} Bey</h2>
             </div>
-            <button onClick={() => loadData()} disabled={loading} className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-white border border-slate-100 text-blue-600 shadow-lg shadow-blue-100 hover:shadow-xl hover:-translate-y-1 transition-all active:scale-95 ${loading ? 'animate-spin bg-blue-50' : ''}`}>
+            <button onClick={() => loadData()} disabled={loading} className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-slate-800 border border-slate-700 text-blue-500 shadow-lg shadow-blue-900/20 hover:shadow-xl hover:-translate-y-1 transition-all active:scale-95 ${loading ? 'animate-spin bg-slate-800' : ''}`}>
               <i className="fas fa-sync-alt text-lg"></i>
             </button>
           </div>
 
           {filteredTasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center px-6 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
-              <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                  <i className="fas fa-clipboard-check text-4xl text-slate-300"></i>
+            <div className="flex flex-col items-center justify-center py-24 text-center px-6 border-2 border-dashed border-slate-700 rounded-3xl bg-slate-800/50">
+              <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-4 border border-slate-700">
+                  <i className="fas fa-clipboard-check text-4xl text-slate-600"></i>
               </div>
-              <h3 className="text-lg font-bold text-slate-700">Her şey yolunda!</h3>
-              <p className="text-slate-400 text-sm mt-1 max-w-[200px]">Şu anda listede bekleyen veya aktif bir görev bulunmuyor.</p>
-              {!connectionId && <p className="text-xs text-orange-400 mt-4 bg-orange-50 px-3 py-1 rounded-full font-bold">Bağlantı aranıyor...</p>}
+              <h3 className="text-lg font-bold text-slate-200">Her şey yolunda!</h3>
+              <p className="text-slate-500 text-sm mt-1 max-w-[200px]">Şu anda listede bekleyen veya aktif bir görev bulunmuyor.</p>
+              {!connectionId && <p className="text-xs text-orange-400 mt-4 bg-orange-900/20 px-3 py-1 rounded-full font-bold border border-orange-900/50">Bağlantı aranıyor...</p>}
             </div>
           ) : (
             <div className="space-y-5">
@@ -522,52 +522,52 @@ const App: React.FC = () => {
 
       {activeTab === 'add' && currentUser.role === 'AMIR' && (
         <div className="animate-in slide-in-from-right duration-300 pb-24">
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-6 px-1">Yeni Görev</h2>
-          <form onSubmit={handleCreateTask} className="space-y-5 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative overflow-hidden">
+          <h2 className="text-3xl font-black text-slate-100 tracking-tight mb-6 px-1">Yeni Görev</h2>
+          <form onSubmit={handleCreateTask} className="space-y-5 bg-slate-800 p-6 rounded-[2rem] border border-slate-700 shadow-xl shadow-slate-900/50 relative overflow-hidden">
              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
             {!connectionId && (
-                <div className="bg-orange-50 border border-orange-200 text-orange-800 p-4 rounded-xl text-xs font-bold flex items-center gap-3">
+                <div className="bg-orange-900/20 border border-orange-900/50 text-orange-400 p-4 rounded-xl text-xs font-bold flex items-center gap-3">
                     <i className="fas fa-wifi-slash text-lg"></i>
                     Yerel moddasınız. Veriler diğer cihazlara gitmeyebilir.
                 </div>
             )}
             <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Makine Adı</label>
-                <input type="text" className="w-full border-0 bg-slate-50 ring-1 ring-slate-200 rounded-2xl p-4 text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all outline-none placeholder:font-normal" value={newTaskMachine} onChange={e => setNewTaskMachine(e.target.value)} required placeholder="Örn: Enjeksiyon 3" />
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Makine Adı</label>
+                <input type="text" className="w-full border-0 bg-slate-900 ring-1 ring-slate-700 rounded-2xl p-4 text-slate-100 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-slate-900 transition-all outline-none placeholder:font-normal placeholder:text-slate-600" value={newTaskMachine} onChange={e => setNewTaskMachine(e.target.value)} required placeholder="Örn: Enjeksiyon 3" />
             </div>
             
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Görevli Usta</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Görevli Usta</label>
                     <div className="relative">
-                        <select className="w-full appearance-none border-0 bg-slate-50 ring-1 ring-slate-200 rounded-2xl p-4 text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all outline-none" value={newTaskMaster} onChange={e => setNewTaskMaster(e.target.value)} required>
+                        <select className="w-full appearance-none border-0 bg-slate-900 ring-1 ring-slate-700 rounded-2xl p-4 text-slate-100 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-slate-900 transition-all outline-none" value={newTaskMaster} onChange={e => setNewTaskMaster(e.target.value)} required>
                             <option value="">Seçiniz...</option>
                             {ustaList.map(u => <option key={u.name} value={u.name}>{u.name}</option>)}
                         </select>
-                        <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                        <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"></i>
                     </div>
                 </div>
                  <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Öncelik</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Öncelik</label>
                     <div className="relative">
-                        <select className="w-full appearance-none border-0 bg-slate-50 ring-1 ring-slate-200 rounded-2xl p-4 text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all outline-none" value={newTaskPriority} onChange={e => setNewTaskPriority(e.target.value as TaskPriority)}>
+                        <select className="w-full appearance-none border-0 bg-slate-900 ring-1 ring-slate-700 rounded-2xl p-4 text-slate-100 font-bold focus:ring-2 focus:ring-blue-500 focus:bg-slate-900 transition-all outline-none" value={newTaskPriority} onChange={e => setNewTaskPriority(e.target.value as TaskPriority)}>
                              {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
-                         <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                         <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"></i>
                     </div>
                 </div>
             </div>
 
             <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1 mb-1 block">İş Emri Detayı</label>
-                <textarea className="w-full border-0 bg-slate-50 ring-1 ring-slate-200 rounded-2xl p-4 text-slate-800 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all outline-none min-h-[120px] resize-none" value={newTaskDescription} onChange={e => setNewTaskDescription(e.target.value)} required placeholder="Yapılacak işlemi detaylıca tarif ediniz..." />
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">İş Emri Detayı</label>
+                <textarea className="w-full border-0 bg-slate-900 ring-1 ring-slate-700 rounded-2xl p-4 text-slate-100 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:bg-slate-900 transition-all outline-none min-h-[120px] resize-none placeholder:text-slate-600" value={newTaskDescription} onChange={e => setNewTaskDescription(e.target.value)} required placeholder="Yapılacak işlemi detaylıca tarif ediniz..." />
             </div>
             
             <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Fotoğraf (Opsiyonel)</label>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Fotoğraf (Opsiyonel)</label>
                 <div className="flex items-center gap-4">
-                  <label className="flex-1 cursor-pointer bg-slate-50 hover:bg-slate-100 text-slate-500 py-4 rounded-2xl ring-1 ring-slate-200 ring-dashed border-2 border-transparent hover:border-blue-300 flex flex-col items-center justify-center gap-2 transition-all group">
-                    <div className="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <label className="flex-1 cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-500 py-4 rounded-2xl ring-1 ring-slate-700 ring-dashed border-2 border-transparent hover:border-blue-500/50 flex flex-col items-center justify-center gap-2 transition-all group">
+                    <div className="w-10 h-10 bg-slate-800 rounded-full shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
                         <i className="fas fa-camera text-blue-500 text-lg"></i>
                     </div>
                     <span className="text-xs font-bold">Fotoğraf Çek / Yükle</span>
@@ -580,7 +580,7 @@ const App: React.FC = () => {
                     />
                   </label>
                   {newTaskImage && (
-                    <div className="relative w-24 h-24 rounded-2xl overflow-hidden shadow-lg ring-2 ring-white">
+                    <div className="relative w-24 h-24 rounded-2xl overflow-hidden shadow-lg ring-2 ring-slate-700">
                       <img src={newTaskImage} alt="Önizleme" className="w-full h-full object-cover" />
                       <button 
                         type="button" 
@@ -594,7 +594,7 @@ const App: React.FC = () => {
                 </div>
             </div>
 
-            <button disabled={loading} className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-blue-200 hover:shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
+            <button disabled={loading} className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-blue-900/40 hover:shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
                 {loading ? (
                     <>
                     <i className="fas fa-circle-notch animate-spin"></i>
@@ -613,40 +613,40 @@ const App: React.FC = () => {
 
       {activeTab === 'profile' && (
         <div className="animate-in slide-in-from-left duration-300 pb-24">
-           <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-6 px-1">Ayarlar</h2>
+           <h2 className="text-3xl font-black text-slate-100 tracking-tight mb-6 px-1">Ayarlar</h2>
            
            {isErkan && (
-               <div className="bg-white p-6 rounded-[2rem] border border-blue-100 shadow-xl shadow-blue-50 mb-6 relative overflow-hidden group">
-                   <div className="absolute top-0 right-0 p-0 opacity-5 group-hover:opacity-10 transition-opacity"><i className="fas fa-users-cog text-[150px] text-blue-800 -mr-10 -mt-10"></i></div>
-                   <h3 className="font-black text-slate-800 mb-6 flex items-center gap-3 text-lg relative z-10">
-                       <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
+               <div className="bg-slate-800 p-6 rounded-[2rem] border border-blue-900/30 shadow-xl shadow-blue-900/10 mb-6 relative overflow-hidden group">
+                   <div className="absolute top-0 right-0 p-0 opacity-5 group-hover:opacity-10 transition-opacity"><i className="fas fa-users-cog text-[150px] text-blue-500 -mr-10 -mt-10"></i></div>
+                   <h3 className="font-black text-slate-100 mb-6 flex items-center gap-3 text-lg relative z-10">
+                       <div className="w-10 h-10 rounded-xl bg-blue-900/30 flex items-center justify-center text-blue-400">
                            <i className="fas fa-user-shield"></i>
                        </div>
                        Personel Yönetimi
                    </h3>
                    
-                   <div className="bg-slate-50 p-4 rounded-2xl mb-6 ring-1 ring-slate-100 relative z-10">
-                       <p className="text-xs font-bold text-slate-400 uppercase mb-3 ml-1">Yeni Personel Ekle</p>
+                   <div className="bg-slate-900/50 p-4 rounded-2xl mb-6 ring-1 ring-slate-700 relative z-10">
+                       <p className="text-xs font-bold text-slate-500 uppercase mb-3 ml-1">Yeni Personel Ekle</p>
                        <div className="flex flex-col gap-3">
                            <div className="grid grid-cols-2 gap-3">
                                <input 
                                    type="text" 
                                    placeholder="Ad Soyad" 
-                                   className="p-3.5 rounded-xl border-0 bg-white ring-1 ring-slate-200 text-sm w-full font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                                   className="p-3.5 rounded-xl border-0 bg-slate-800 ring-1 ring-slate-700 text-sm w-full font-bold focus:ring-2 focus:ring-blue-500 outline-none text-slate-100 placeholder:text-slate-600"
                                    value={newMemberName}
                                    onChange={(e) => setNewMemberName(e.target.value)}
                                />
                                <input 
                                    type="text" 
                                    placeholder="Şifre (İsteğe Bağlı)" 
-                                   className="p-3.5 rounded-xl border-0 bg-white ring-1 ring-slate-200 text-sm w-full font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                                   className="p-3.5 rounded-xl border-0 bg-slate-800 ring-1 ring-slate-700 text-sm w-full font-bold focus:ring-2 focus:ring-blue-500 outline-none text-slate-100 placeholder:text-slate-600"
                                    value={newMemberPassword}
                                    onChange={(e) => setNewMemberPassword(e.target.value)}
                                />
                            </div>
                            <div className="flex gap-2">
                                <select 
-                                   className="p-3.5 rounded-xl border-0 bg-white ring-1 ring-slate-200 text-sm font-bold outline-none"
+                                   className="p-3.5 rounded-xl border-0 bg-slate-800 ring-1 ring-slate-700 text-sm font-bold outline-none text-slate-100"
                                    value={newMemberRole}
                                    onChange={(e) => setNewMemberRole(e.target.value as any)}
                                >
@@ -655,7 +655,7 @@ const App: React.FC = () => {
                                </select>
                                <button 
                                    onClick={handleAddMember}
-                                   className="flex-1 bg-blue-600 text-white rounded-xl font-bold text-sm shadow-lg hover:bg-blue-700 active:scale-95 transition-all"
+                                   className="flex-1 bg-blue-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-900/40 hover:bg-blue-700 active:scale-95 transition-all"
                                >
                                    KAYDET
                                </button>
@@ -665,27 +665,27 @@ const App: React.FC = () => {
 
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
                        <div>
-                           <h4 className="text-xs font-bold text-blue-500 uppercase mb-3 pl-1">Amir Kadrosu</h4>
+                           <h4 className="text-xs font-bold text-blue-400 uppercase mb-3 pl-1">Amir Kadrosu</h4>
                            <ul className="space-y-2">
                                {amirList.map(member => (
-                                   <li key={member.name} className="flex justify-between items-center bg-white p-3 rounded-xl ring-1 ring-slate-100 text-xs font-bold text-slate-700 shadow-sm">
+                                   <li key={member.name} className="flex justify-between items-center bg-slate-800 p-3 rounded-xl ring-1 ring-slate-700 text-xs font-bold text-slate-300 shadow-sm">
                                        <span className="flex items-center gap-2">
-                                           <div className="w-2 h-2 rounded-full bg-blue-400"></div> 
+                                           <div className="w-2 h-2 rounded-full bg-blue-500"></div> 
                                            {member.name}
-                                           {member.password && <i className="fas fa-lock text-slate-300 ml-1" title="Şifreli"></i>}
+                                           {member.password && <i className="fas fa-lock text-slate-600 ml-1" title="Şifreli"></i>}
                                        </span>
                                        <div className="flex items-center gap-2">
                                             {member.name !== currentUser.name && (
                                                 <button 
                                                     onClick={() => { setPasswordChangeModal({show: true, memberName: member.name, role: 'AMIR'}); setNewPasswordInput(''); }}
-                                                    className="w-6 h-6 rounded-full bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-colors flex items-center justify-center"
+                                                    className="w-6 h-6 rounded-full bg-blue-900/30 text-blue-400 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center"
                                                     title="Şifre Değiştir"
                                                 >
                                                     <i className="fas fa-key text-[10px]"></i>
                                                 </button>
                                             )}
                                             {member.name !== currentUser.name && (
-                                                <button onClick={() => handleRemoveMember(member.name, 'AMIR')} className="w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center">
+                                                <button onClick={() => handleRemoveMember(member.name, 'AMIR')} className="w-6 h-6 rounded-full bg-slate-700 text-slate-400 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center">
                                                     <i className="fas fa-trash-alt text-[10px]"></i>
                                                 </button>
                                             )}
@@ -695,24 +695,24 @@ const App: React.FC = () => {
                            </ul>
                        </div>
                        <div>
-                           <h4 className="text-xs font-bold text-emerald-500 uppercase mb-3 pl-1">Usta Kadrosu</h4>
+                           <h4 className="text-xs font-bold text-emerald-400 uppercase mb-3 pl-1">Usta Kadrosu</h4>
                            <ul className="space-y-2">
                                {ustaList.map(member => (
-                                   <li key={member.name} className="flex justify-between items-center bg-white p-3 rounded-xl ring-1 ring-slate-100 text-xs font-bold text-slate-700 shadow-sm">
+                                   <li key={member.name} className="flex justify-between items-center bg-slate-800 p-3 rounded-xl ring-1 ring-slate-700 text-xs font-bold text-slate-300 shadow-sm">
                                        <span className="flex items-center gap-2">
-                                           <div className="w-2 h-2 rounded-full bg-emerald-400"></div> 
+                                           <div className="w-2 h-2 rounded-full bg-emerald-500"></div> 
                                            {member.name}
-                                           {member.password && <i className="fas fa-lock text-slate-300 ml-1" title="Şifreli"></i>}
+                                           {member.password && <i className="fas fa-lock text-slate-600 ml-1" title="Şifreli"></i>}
                                        </span>
                                        <div className="flex items-center gap-2">
                                             <button 
                                                 onClick={() => { setPasswordChangeModal({show: true, memberName: member.name, role: 'USTA'}); setNewPasswordInput(''); }}
-                                                className="w-6 h-6 rounded-full bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-colors flex items-center justify-center"
+                                                className="w-6 h-6 rounded-full bg-blue-900/30 text-blue-400 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-center"
                                                 title="Şifre Değiştir"
                                             >
                                                 <i className="fas fa-key text-[10px]"></i>
                                             </button>
-                                            <button onClick={() => handleRemoveMember(member.name, 'USTA')} className="w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center">
+                                            <button onClick={() => handleRemoveMember(member.name, 'USTA')} className="w-6 h-6 rounded-full bg-slate-700 text-slate-400 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center">
                                                 <i className="fas fa-trash-alt text-[10px]"></i>
                                             </button>
                                        </div>
@@ -724,19 +724,19 @@ const App: React.FC = () => {
                </div>
            )}
 
-           <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 space-y-6">
+           <div className="bg-slate-800 p-6 rounded-[2rem] border border-slate-700 shadow-xl shadow-slate-900/50 space-y-6">
               <div className="text-center">
-                 <p className="text-xs font-bold text-slate-400 uppercase mb-3">Bulut Bağlantı ID</p>
-                 <div className={`text-xl font-mono font-bold tracking-widest py-5 rounded-2xl border-2 border-dashed select-all break-all px-4 ${connectionId ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                 <p className="text-xs font-bold text-slate-500 uppercase mb-3">Bulut Bağlantı ID</p>
+                 <div className={`text-xl font-mono font-bold tracking-widest py-5 rounded-2xl border-2 border-dashed select-all break-all px-4 ${connectionId ? 'bg-emerald-900/20 text-emerald-400 border-emerald-800/50' : 'bg-slate-900 text-slate-500 border-slate-700'}`}>
                     {connectionId || "BAĞLANTI YOK"}
                  </div>
               </div>
               <div className="grid grid-cols-1 gap-4">
-                 <button onClick={handleCreateConnection} className="bg-slate-800 text-white py-4 rounded-xl font-bold text-sm shadow-lg hover:bg-slate-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+                 <button onClick={handleCreateConnection} className="bg-slate-700 text-white py-4 rounded-xl font-bold text-sm shadow-lg hover:bg-slate-600 active:scale-95 transition-all flex items-center justify-center gap-2">
                     <i className="fas fa-magic"></i>
                     YENİ KOD OLUŞTUR
                  </button>
-                 <button onClick={handleJoinConnection} className="bg-white text-slate-700 py-4 rounded-xl font-bold text-sm border-2 border-slate-100 hover:border-slate-300 hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center gap-2">
+                 <button onClick={handleJoinConnection} className="bg-slate-800 text-slate-300 py-4 rounded-xl font-bold text-sm border-2 border-slate-700 hover:border-slate-500 hover:bg-slate-700 active:scale-95 transition-all flex items-center justify-center gap-2">
                     <i className="fas fa-link"></i>
                     MEVCUT KODU GİR
                  </button>
@@ -748,34 +748,34 @@ const App: React.FC = () => {
       {/* Şifre Değiştirme Modalı */}
       {passwordChangeModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
-              <div className="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl scale-100 animate-in zoom-in-95 duration-200 relative overflow-hidden">
+              <div className="bg-slate-800 rounded-3xl p-6 w-full max-w-xs shadow-2xl scale-100 animate-in zoom-in-95 duration-200 relative overflow-hidden border border-slate-700">
                    <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
                   <div className="text-center mb-6">
-                      <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner">
+                      <div className="w-16 h-16 bg-blue-900/30 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner border border-blue-800/30">
                           <i className="fas fa-key text-2xl"></i>
                       </div>
-                      <h3 className="text-lg font-black text-slate-800">Şifre Güncelle</h3>
-                      <p className="text-sm text-slate-500 font-medium">{passwordChangeModal.memberName}</p>
+                      <h3 className="text-lg font-black text-slate-100">Şifre Güncelle</h3>
+                      <p className="text-sm text-slate-400 font-medium">{passwordChangeModal.memberName}</p>
                   </div>
 
                   <form onSubmit={handleChangePassword}>
                       <div className="mb-4">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Yeni Şifre</label>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Yeni Şifre</label>
                         <input 
                             type="text" 
                             autoFocus
                             placeholder="Yeni şifre (Boş bırakılırsa kaldırılır)" 
-                            className="w-full text-center font-bold p-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white outline-none transition-all"
+                            className="w-full text-center font-bold p-3 rounded-xl bg-slate-900 border border-slate-700 focus:border-blue-500 focus:bg-slate-800 outline-none transition-all text-white placeholder:text-slate-600"
                             value={newPasswordInput}
                             onChange={(e) => setNewPasswordInput(e.target.value)}
                         />
                       </div>
 
                       <div className="grid grid-cols-2 gap-3 mt-4">
-                          <button type="button" onClick={() => { setPasswordChangeModal(null); setNewPasswordInput(''); }} className="py-3 rounded-xl font-bold text-sm text-slate-500 bg-slate-100 hover:bg-slate-200">
+                          <button type="button" onClick={() => { setPasswordChangeModal(null); setNewPasswordInput(''); }} className="py-3 rounded-xl font-bold text-sm text-slate-400 bg-slate-700 hover:bg-slate-600 hover:text-white transition-colors">
                               Vazgeç
                           </button>
-                          <button type="submit" className="py-3 rounded-xl font-bold text-sm text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200">
+                          <button type="submit" className="py-3 rounded-xl font-bold text-sm text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-900/50">
                               Kaydet
                           </button>
                       </div>

@@ -17,19 +17,19 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
   const [isCollapsed, setIsCollapsed] = useState(task.status === TaskStatus.COMPLETED || task.status === TaskStatus.CANCELLED);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Modern Renk Paletleri
+  // Modern Dark Mode Renk Paletleri
   const statusConfig = {
-    [TaskStatus.PENDING]: { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-100', icon: 'fa-clock', label: 'Beklemede' },
-    [TaskStatus.IN_PROGRESS]: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-100', icon: 'fa-spinner fa-spin', label: 'İşlemde' },
-    [TaskStatus.COMPLETED]: { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100', icon: 'fa-check-circle', label: 'Tamamlandı' },
-    [TaskStatus.CANCELLED]: { bg: 'bg-slate-50', text: 'text-slate-500', border: 'border-slate-100', icon: 'fa-ban', label: 'İptal' },
+    [TaskStatus.PENDING]: { bg: 'bg-amber-900/30', text: 'text-amber-400', border: 'border-amber-800/50', icon: 'fa-clock', label: 'Beklemede' },
+    [TaskStatus.IN_PROGRESS]: { bg: 'bg-blue-900/30', text: 'text-blue-400', border: 'border-blue-800/50', icon: 'fa-spinner fa-spin', label: 'İşlemde' },
+    [TaskStatus.COMPLETED]: { bg: 'bg-emerald-900/30', text: 'text-emerald-400', border: 'border-emerald-800/50', icon: 'fa-check-circle', label: 'Tamamlandı' },
+    [TaskStatus.CANCELLED]: { bg: 'bg-slate-700/50', text: 'text-slate-400', border: 'border-slate-600/50', icon: 'fa-ban', label: 'İptal' },
   };
 
   const priorityConfig = {
-    [TaskPriority.LOW]: { color: 'text-slate-400', bg: 'bg-slate-100' },
-    [TaskPriority.MEDIUM]: { color: 'text-blue-400', bg: 'bg-blue-50' },
-    [TaskPriority.HIGH]: { color: 'text-orange-500', bg: 'bg-orange-50' },
-    [TaskPriority.CRITICAL]: { color: 'text-red-500', bg: 'bg-red-50' },
+    [TaskPriority.LOW]: { color: 'text-slate-400', bg: 'bg-slate-700/50' },
+    [TaskPriority.MEDIUM]: { color: 'text-blue-400', bg: 'bg-blue-900/30' },
+    [TaskPriority.HIGH]: { color: 'text-orange-400', bg: 'bg-orange-900/30' },
+    [TaskPriority.CRITICAL]: { color: 'text-red-400', bg: 'bg-red-900/30' },
   };
 
   const formatTime = (timestamp?: number) => {
@@ -114,19 +114,19 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
 
   return (
     <>
-      <div className={`bg-white rounded-[1.25rem] shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] transition-all duration-300 hover:shadow-lg border border-slate-100 overflow-hidden relative ${isCancelled ? 'opacity-75 grayscale-[0.8]' : ''}`}>
+      <div className={`bg-slate-800 rounded-[1.25rem] shadow-lg transition-all duration-300 border border-slate-700 overflow-hidden relative ${isCancelled ? 'opacity-60 grayscale-[0.8]' : ''}`}>
         
         {/* Sol Kenar Çizgisi (Renkli Bar) */}
-        <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${currentStatus.bg.replace('bg-', 'bg-').replace('-50', '-400')}`}></div>
+        <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${currentStatus.bg.replace('/30', '').replace('bg-', 'bg-').replace('-900', '-500')}`}></div>
 
         {/* Header - Tıklanabilir Alan */}
         <div 
           onClick={() => setIsCollapsed(!isCollapsed)} 
-          className={`relative pl-5 pr-4 py-4 cursor-pointer select-none bg-white`}
+          className={`relative pl-5 pr-4 py-4 cursor-pointer select-none bg-slate-800`}
         >
           <div className="flex justify-between items-start">
             <div className="flex-1 pr-2">
-               <div className="flex items-center gap-2 mb-1.5">
+               <div className="flex items-center gap-2 mb-2">
                    {/* Status Badge */}
                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide border ${currentStatus.bg} ${currentStatus.text} ${currentStatus.border}`}>
                        <i className={`fas ${currentStatus.icon}`}></i>
@@ -139,12 +139,12 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                    </span>
                </div>
                
-               <h3 className={`text-lg font-black text-slate-800 leading-tight ${isCancelled ? 'line-through decoration-2 decoration-red-300 text-slate-400' : ''}`}>
+               <h3 className={`text-lg font-black text-slate-100 leading-tight ${isCancelled ? 'line-through decoration-2 decoration-red-900 text-slate-500' : ''}`}>
                  {task.machineName}
                </h3>
 
                {isCollapsed && (
-                   <p className="text-xs text-slate-500 mt-1 truncate pr-8">{task.description}</p>
+                   <p className="text-xs text-slate-400 mt-1 truncate pr-8">{task.description}</p>
                )}
             </div>
 
@@ -154,12 +154,12 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                  {user.role === 'AMIR' && (
                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         {!isCancelled && task.status !== TaskStatus.COMPLETED && (
-                            <button onClick={handleCancelTask} className="w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors" title="İptal Et">
+                            <button onClick={handleCancelTask} className="w-8 h-8 rounded-full bg-red-900/30 text-red-400 flex items-center justify-center hover:bg-red-600 hover:text-white transition-colors" title="İptal Et">
                                 <i className="fas fa-ban text-xs"></i>
                             </button>
                         )}
                         {onDelete && (
-                            <button onClick={handleDeleteTask} className="w-8 h-8 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors" title="Sil">
+                            <button onClick={handleDeleteTask} className="w-8 h-8 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center hover:bg-red-600 hover:text-white transition-colors" title="Sil">
                                 <i className="fas fa-trash-alt text-xs"></i>
                             </button>
                         )}
@@ -167,7 +167,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                  )}
                  
                  <div className={`transition-transform duration-300 ${isCollapsed ? 'rotate-0' : 'rotate-180'}`}>
-                    <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
+                    <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-400">
                         <i className="fas fa-chevron-down text-xs"></i>
                     </div>
                  </div>
@@ -176,23 +176,23 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
           
           {/* Usta İsmi ve Tarih (Collapsed) */}
           {isCollapsed && (
-              <div className="mt-3 flex items-center justify-between border-t border-slate-50 pt-2">
+              <div className="mt-3 flex items-center justify-between border-t border-slate-700 pt-2">
                   <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                      <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-400">
                           {task.masterName.substring(0,1)}
                       </div>
-                      <span className="text-xs font-bold text-slate-600">{task.masterName}</span>
+                      <span className="text-xs font-bold text-slate-400">{task.masterName}</span>
                   </div>
-                  <span className="text-[10px] font-medium text-slate-400">{new Date(task.createdAt).toLocaleDateString('tr-TR')}</span>
+                  <span className="text-[10px] font-medium text-slate-500">{new Date(task.createdAt).toLocaleDateString('tr-TR')}</span>
               </div>
           )}
         </div>
 
         {/* Genişletilmiş İçerik */}
         {!isCollapsed && (
-          <div className="pl-5 pr-4 pb-5 animate-in slide-in-from-top-2 duration-300">
-            <div className="bg-slate-50 p-4 rounded-xl text-sm text-slate-600 mb-4 border border-slate-100 leading-relaxed shadow-inner">
-               <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-1">İş Emri Açıklaması</h4>
+          <div className="pl-5 pr-4 pb-5 animate-in slide-in-from-top-2 duration-300 bg-slate-800">
+            <div className="bg-slate-900/50 p-4 rounded-xl text-sm text-slate-300 mb-4 border border-slate-700 leading-relaxed shadow-inner">
+               <h4 className="text-[10px] font-bold text-slate-500 uppercase mb-1">İş Emri Açıklaması</h4>
               {task.description}
             </div>
 
@@ -201,7 +201,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                 {task.image && (
                   <button 
                     onClick={() => setIsImageExpanded({url: task.image!, title: 'Arıza Görüntüsü'})}
-                    className="relative group w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden border-2 border-slate-100 shadow-sm hover:border-blue-300 transition-colors"
+                    className="relative group w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden border-2 border-slate-700 shadow-sm hover:border-blue-500 transition-colors"
                   >
                     <img src={task.image} alt="Görev" className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-blue-900/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -212,7 +212,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                 {task.completedImage && (
                   <button 
                     onClick={() => setIsImageExpanded({url: task.completedImage!, title: 'Tamamlanan İş'})}
-                    className="relative group w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden border-2 border-emerald-100 shadow-sm hover:border-emerald-300 transition-colors"
+                    className="relative group w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden border-2 border-emerald-800 shadow-sm hover:border-emerald-500 transition-colors"
                   >
                     <img src={task.completedImage} alt="Bitiş" className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-emerald-900/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -224,40 +224,40 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
 
             {/* Detay Bilgileri Grid */}
             <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="bg-white border border-slate-100 p-2.5 rounded-lg flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400"><i className="fas fa-user text-xs"></i></div>
+                <div className="bg-slate-700/30 border border-slate-700 p-2.5 rounded-lg flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-400"><i className="fas fa-user text-xs"></i></div>
                     <div>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase">Görevli</p>
-                        <p className="text-xs font-bold text-slate-700">{task.masterName}</p>
+                        <p className="text-[9px] text-slate-500 font-bold uppercase">Görevli</p>
+                        <p className="text-xs font-bold text-slate-300">{task.masterName}</p>
                     </div>
                 </div>
-                <div className="bg-white border border-slate-100 p-2.5 rounded-lg flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400"><i className="far fa-calendar text-xs"></i></div>
+                <div className="bg-slate-700/30 border border-slate-700 p-2.5 rounded-lg flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-400"><i className="far fa-calendar text-xs"></i></div>
                     <div>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase">Tarih</p>
-                        <p className="text-xs font-bold text-slate-700">{new Date(task.createdAt).toLocaleDateString('tr-TR')}</p>
+                        <p className="text-[9px] text-slate-500 font-bold uppercase">Tarih</p>
+                        <p className="text-xs font-bold text-slate-300">{new Date(task.createdAt).toLocaleDateString('tr-TR')}</p>
                     </div>
                 </div>
             </div>
 
             {/* Süreç Takibi (Timeline benzeri) */}
             {(task.startedAt || task.status === TaskStatus.IN_PROGRESS || task.status === TaskStatus.COMPLETED) && !isCancelled && (
-              <div className="mb-4 bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center justify-between text-center relative overflow-hidden">
-                <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-200 -z-0"></div>
-                <div className="relative z-10 bg-slate-50 px-2">
-                    <div className="text-[10px] font-bold text-slate-400 mb-1">BAŞLAMA</div>
-                    <div className="inline-block bg-white border border-slate-200 text-slate-700 text-xs font-mono font-bold px-2 py-1 rounded-md shadow-sm">
+              <div className="mb-4 bg-slate-700/30 rounded-xl p-3 border border-slate-700 flex items-center justify-between text-center relative overflow-hidden">
+                <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-700 -z-0"></div>
+                <div className="relative z-10 bg-slate-800 px-2 rounded">
+                    <div className="text-[10px] font-bold text-slate-500 mb-1">BAŞLAMA</div>
+                    <div className="inline-block bg-slate-700 border border-slate-600 text-slate-300 text-xs font-mono font-bold px-2 py-1 rounded-md shadow-sm">
                         {formatTime(task.startedAt)}
                     </div>
                 </div>
-                 <div className="relative z-10 bg-slate-50 px-2">
-                     <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold shadow-sm ring-4 ring-slate-50">
+                 <div className="relative z-10 bg-slate-800 px-2 rounded">
+                     <div className="w-8 h-8 rounded-full bg-blue-900/50 text-blue-400 flex items-center justify-center text-xs font-bold shadow-sm ring-4 ring-slate-800 border border-blue-900/50">
                          {calculateDuration()}
                      </div>
                  </div>
-                <div className="relative z-10 bg-slate-50 px-2">
-                    <div className="text-[10px] font-bold text-slate-400 mb-1">BİTİŞ</div>
-                    <div className={`inline-block border text-xs font-mono font-bold px-2 py-1 rounded-md shadow-sm ${task.completedAt ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-slate-100 border-slate-200 text-slate-400'}`}>
+                <div className="relative z-10 bg-slate-800 px-2 rounded">
+                    <div className="text-[10px] font-bold text-slate-500 mb-1">BİTİŞ</div>
+                    <div className={`inline-block border text-xs font-mono font-bold px-2 py-1 rounded-md shadow-sm ${task.completedAt ? 'bg-emerald-900/30 border-emerald-800 text-emerald-400' : 'bg-slate-700 border-slate-600 text-slate-500'}`}>
                         {task.completedAt ? formatTime(task.completedAt) : '--:--'}
                     </div>
                 </div>
@@ -265,41 +265,41 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
             )}
 
             {task.comments && (
-              <div className="mb-5 p-4 bg-emerald-50/50 rounded-xl border border-emerald-100 relative">
-                 <i className="fas fa-quote-left absolute top-3 left-3 text-emerald-200 text-xl"></i>
+              <div className="mb-5 p-4 bg-emerald-900/10 rounded-xl border border-emerald-900/30 relative">
+                 <i className="fas fa-quote-left absolute top-3 left-3 text-emerald-800 text-xl"></i>
                  <div className="relative z-10 pl-6">
-                    <p className="text-[9px] font-black text-emerald-600 uppercase mb-1">
+                    <p className="text-[9px] font-black text-emerald-500 uppercase mb-1">
                     {isCancelled ? 'İPTAL NOTU' : 'USTA RAPORU'}
                     </p>
-                    <p className="text-sm text-slate-700 italic">"{task.comments}"</p>
+                    <p className="text-sm text-slate-300 italic">"{task.comments}"</p>
                  </div>
               </div>
             )}
 
             {/* Aksiyon Butonları */}
             {user.role === 'USTA' && !isCancelled && task.status !== TaskStatus.COMPLETED && (
-              <div className="pt-2 border-t border-slate-100">
+              <div className="pt-2 border-t border-slate-700">
                 {!showCommentInput ? (
                   <button 
                     onClick={handleStatusChange}
                     className={`w-full py-4 rounded-xl font-black text-sm tracking-wide flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg ${
                       task.status === TaskStatus.PENDING 
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-200 hover:shadow-blue-300' 
-                      : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-emerald-200 hover:shadow-emerald-300'
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-900/40 hover:shadow-blue-900/60' 
+                      : 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-900/40 hover:shadow-emerald-900/60'
                     }`}
                   >
                     <i className={`fas ${task.status === TaskStatus.PENDING ? 'fa-play' : 'fa-clipboard-check'} text-lg`}></i>
                     {task.status === TaskStatus.PENDING ? 'İŞE BAŞLA' : 'GÖREVİ TAMAMLA'}
                   </button>
                 ) : (
-                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 animate-in fade-in zoom-in-95 duration-200">
-                    <h4 className="text-sm font-black text-slate-700 mb-3 flex items-center gap-2">
+                  <div className="bg-slate-800 rounded-xl border border-slate-700 shadow-sm p-4 animate-in fade-in zoom-in-95 duration-200">
+                    <h4 className="text-sm font-black text-slate-200 mb-3 flex items-center gap-2">
                         <i className="fas fa-file-signature text-emerald-500"></i>
                         Tamamlama Raporu
                     </h4>
                     
                     <textarea 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm mb-4 focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all placeholder:text-slate-400"
+                      className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-sm mb-4 focus:ring-2 focus:ring-emerald-500 focus:bg-slate-900 outline-none transition-all placeholder:text-slate-600 text-white"
                       rows={3}
                       placeholder="Yapılan işlemleri detaylıca yazınız..."
                       value={comment}
@@ -307,21 +307,21 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                     ></textarea>
 
                     <div className="mb-4">
-                        <label className="flex items-center gap-3 p-3 rounded-xl border border-dashed border-slate-300 hover:border-emerald-400 hover:bg-emerald-50 transition-colors cursor-pointer group">
-                             <div className="w-10 h-10 rounded-full bg-slate-100 group-hover:bg-emerald-100 flex items-center justify-center text-slate-400 group-hover:text-emerald-500 transition-colors">
+                        <label className="flex items-center gap-3 p-3 rounded-xl border border-dashed border-slate-600 hover:border-emerald-500 hover:bg-emerald-900/10 transition-colors cursor-pointer group">
+                             <div className="w-10 h-10 rounded-full bg-slate-700 group-hover:bg-emerald-900/30 flex items-center justify-center text-slate-400 group-hover:text-emerald-500 transition-colors">
                                  <i className="fas fa-camera"></i>
                              </div>
                              <div className="flex-1">
-                                 <span className="block text-xs font-bold text-slate-600 group-hover:text-emerald-700">Fotoğraf Ekle</span>
-                                 <span className="block text-[10px] text-slate-400">Yapılan işin fotoğrafı</span>
+                                 <span className="block text-xs font-bold text-slate-300 group-hover:text-emerald-400">Fotoğraf Ekle</span>
+                                 <span className="block text-[10px] text-slate-500">Yapılan işin fotoğrafı</span>
                              </div>
                              <input type="file" accept="image/*" onChange={handleCompletedImageChange} className="hidden" />
                         </label>
 
-                        {isProcessing && <p className="text-xs text-blue-500 mt-2 font-bold animate-pulse">Fotoğraf işleniyor...</p>}
+                        {isProcessing && <p className="text-xs text-blue-400 mt-2 font-bold animate-pulse">Fotoğraf işleniyor...</p>}
                         
                         {completedImage && (
-                            <div className="mt-3 relative w-full h-32 rounded-xl overflow-hidden shadow-md">
+                            <div className="mt-3 relative w-full h-32 rounded-xl overflow-hidden shadow-md border border-slate-600">
                                 <img src={completedImage} alt="Önizleme" className="w-full h-full object-cover" />
                                 <button onClick={() => setCompletedImage(null)} className="absolute top-2 right-2 bg-black/50 hover:bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm transition-colors">
                                     <i className="fas fa-times"></i>
@@ -333,14 +333,14 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                     <div className="flex gap-3">
                       <button 
                         onClick={() => { setShowCommentInput(false); setComment(''); setCompletedImage(null); }}
-                        className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs hover:bg-slate-200 transition-colors"
+                        className="flex-1 py-3 bg-slate-700 text-slate-300 rounded-xl font-bold text-xs hover:bg-slate-600 transition-colors"
                       >
                         VAZGEÇ
                       </button>
                       <button 
                         onClick={submitCompletion}
                         disabled={!comment.trim() || isProcessing}
-                        className="flex-[2] py-3 bg-emerald-600 text-white rounded-xl font-bold text-xs shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        className="flex-[2] py-3 bg-emerald-600 text-white rounded-xl font-bold text-xs shadow-lg shadow-emerald-900/40 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       >
                         ONAYLA VE BİTİR
                       </button>
@@ -355,15 +355,15 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
         {/* Resim Büyütme Modalı */}
         {isImageExpanded && (
             <div 
-                className="fixed inset-0 bg-slate-900/95 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200"
+                className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200"
                 onClick={() => setIsImageExpanded(null)}
             >
                 <div className="relative w-full max-w-lg flex flex-col items-center" onClick={e => e.stopPropagation()}>
                     <button onClick={() => setIsImageExpanded(null)} className="absolute -top-12 right-0 text-white/70 hover:text-white text-3xl">
                         <i className="fas fa-times-circle"></i>
                     </button>
-                    <img src={isImageExpanded.url} alt="Büyük" className="w-full rounded-2xl shadow-2xl object-contain max-h-[70vh] bg-black" />
-                    <div className="mt-6 bg-white/10 backdrop-blur-md px-6 py-2 rounded-full border border-white/20">
+                    <img src={isImageExpanded.url} alt="Büyük" className="w-full rounded-2xl shadow-2xl object-contain max-h-[70vh] bg-black border border-slate-800" />
+                    <div className="mt-6 bg-slate-800/80 backdrop-blur-md px-6 py-2 rounded-full border border-slate-700">
                         <p className="text-white font-bold">{isImageExpanded.title}</p>
                     </div>
                 </div>
