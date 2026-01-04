@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Task, User, TaskStatus, TaskPriority } from './types';
 import { fetchAppData, saveAppData, createNewBin, getStoredBinId, setStoredBinId, getEmergencyId, extractBinId, checkConnection } from './services/dbService';
 import Layout from './components/Layout';
@@ -31,6 +31,8 @@ const App: React.FC = () => {
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskMaster, setNewTaskMaster] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
+  const [newTaskImage, setNewTaskImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Veri Yükleme
   const loadData = useCallback(async (forceId?: string) => {
@@ -193,6 +195,43 @@ const App: React.FC = () => {
       setLoading(false);
   };
 
+  // Resim sıkıştırma ve işleme
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Boyutlandırma (Max genişlik 800px)
+        const maxWidth = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // JPEG olarak sıkıştır (Kalite 0.7)
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+        setNewTaskImage(compressedBase64);
+        setLoading(false);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskMachine || !newTaskDescription || !newTaskMaster) return;
@@ -205,6 +244,7 @@ const App: React.FC = () => {
       status: TaskStatus.PENDING,
       priority: newTaskPriority,
       createdAt: Date.now(),
+      image: newTaskImage || undefined
     };
 
     const updatedTasks = [newTask, ...tasks];
@@ -217,6 +257,8 @@ const App: React.FC = () => {
     setNewTaskMachine('');
     setNewTaskDescription('');
     setNewTaskMaster('');
+    setNewTaskImage(null);
+    if(fileInputRef.current) fileInputRef.current.value = '';
     alert("Görev yayınlandı.");
     setActiveTab('tasks');
   };
@@ -231,9 +273,7 @@ const App: React.FC = () => {
               ...t,
               status: newStatus,
               comments: comment || t.comments,
-              // Eğer yeni durum IN_PROGRESS ise ve daha önce başlamadıysa başlama zamanını kaydet
               startedAt: newStatus === TaskStatus.IN_PROGRESS ? (t.startedAt || now) : t.startedAt,
-              // Eğer yeni durum COMPLETED ise bitiş zamanını kaydet
               completedAt: newStatus === TaskStatus.COMPLETED ? now : t.completedAt
             };
         }
@@ -359,6 +399,37 @@ const App: React.FC = () => {
                 <label className="text-xs font-bold text-slate-500 uppercase">Açıklama</label>
                 <textarea className="w-full border border-slate-200 rounded-xl p-3 mt-1 bg-slate-50 h-24" value={newTaskDescription} onChange={e => setNewTaskDescription(e.target.value)} required placeholder="İş emri detayı..." />
             </div>
+            
+            {/* Fotoğraf Ekleme Alanı */}
+            <div>
+                <label className="text-xs font-bold text-slate-500 uppercase">Fotoğraf Ekle (İsteğe Bağlı)</label>
+                <div className="mt-1 flex items-center gap-4">
+                  <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-3 rounded-xl border border-slate-300 flex items-center gap-2 text-sm font-bold transition-colors">
+                    <i className="fas fa-camera"></i> Fotoğraf Seç
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      ref={fileInputRef}
+                      onChange={handleImageChange}
+                    />
+                  </label>
+                  {newTaskImage && (
+                    <div className="relative group">
+                      <img src={newTaskImage} alt="Önizleme" className="w-12 h-12 rounded-lg object-cover border border-slate-200 shadow-sm" />
+                      <button 
+                        type="button" 
+                        onClick={() => { setNewTaskImage(null); if(fileInputRef.current) fileInputRef.current.value = ''; }}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs shadow-md"
+                      >
+                        <i className="fas fa-times"></i>
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1 pl-1">* Resimler otomatik olarak küçültülecektir.</p>
+            </div>
+
             <button disabled={loading} className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition-all">
                 {loading ? 'Gönderiliyor...' : 'GÖREVİ YAYINLA'}
             </button>
