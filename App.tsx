@@ -13,7 +13,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'tasks' | 'add' | 'profile'>('tasks');
   const [loginInput, setLoginInput] = useState('');
   
-  // Form State for Adding Task
+  // Form State
   const [newTaskMachine, setNewTaskMachine] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskMaster, setNewTaskMaster] = useState('');
@@ -36,6 +36,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     refreshData();
+    // Arka planda 30 saniyede bir otomatik yenileme
     const interval = setInterval(refreshData, 30000);
     return () => clearInterval(interval);
   }, [refreshData]);
@@ -53,33 +54,31 @@ const App: React.FC = () => {
     e.preventDefault();
     if (!newTaskMachine || !newTaskDescription || !newTaskMaster) return alert("Lütfen tüm alanları doldurun.");
 
-    try {
-      const newTask: Task = {
-        id: Date.now().toString(),
-        machineName: newTaskMachine,
-        masterName: newTaskMaster,
-        description: newTaskDescription,
-        status: TaskStatus.PENDING,
-        priority: newTaskPriority,
-        createdAt: Date.now(),
-      };
+    const newTask: Task = {
+      id: Date.now().toString(),
+      machineName: newTaskMachine,
+      masterName: newTaskMaster,
+      description: newTaskDescription,
+      status: TaskStatus.PENDING,
+      priority: newTaskPriority,
+      createdAt: Date.now(),
+    };
 
-      const updatedTasks = [newTask, ...tasks];
-      setTasks(updatedTasks);
-      const success = await saveTasks(updatedTasks);
-      
-      if (!success) {
-        alert("Bulut senkronizasyonu başarısız oldu, ancak görev yerel olarak eklendi.");
-      }
-      
-      // Reset Form
-      setNewTaskMachine('');
-      setNewTaskDescription('');
-      setNewTaskMaster('');
-      setNewTaskPriority(TaskPriority.MEDIUM);
-      setActiveTab('tasks');
-    } catch (err) {
-      alert("Görev oluşturulurken bir hata oluştu.");
+    const updatedTasks = [newTask, ...tasks];
+    setTasks(updatedTasks);
+    
+    // Reset Form ve Liste Ekranına Dön (Hızlı UX)
+    setNewTaskMachine('');
+    setNewTaskDescription('');
+    setNewTaskMaster('');
+    setNewTaskPriority(TaskPriority.MEDIUM);
+    setActiveTab('tasks');
+
+    // Arka planda kaydet
+    const success = await saveTasks(updatedTasks);
+    if (!success) {
+      setSyncError(true);
+      // Not: success false olsa bile dbService yerel hafızaya kaydettiği için veri kaybolmaz.
     }
   };
 
@@ -97,7 +96,8 @@ const App: React.FC = () => {
     });
 
     setTasks(updatedTasks);
-    await saveTasks(updatedTasks);
+    const success = await saveTasks(updatedTasks);
+    if (!success) setSyncError(true);
   };
 
   if (!currentUser) {
@@ -143,7 +143,7 @@ const App: React.FC = () => {
           </div>
           
           <p className="text-slate-500 text-[10px] text-center mt-8 uppercase tracking-widest font-bold">
-            Hidrolik Birimi Dijital Dönüşüm Sistemi v1.0
+            Hidrolik Birimi Dijital Dönüşüm Sistemi v1.1
           </p>
         </div>
       </div>
@@ -151,7 +151,7 @@ const App: React.FC = () => {
   }
 
   const filteredTasks = currentUser.role === 'USTA' 
-    ? tasks.filter(t => t.masterName === currentUser.name || t.masterName === 'Genel')
+    ? tasks.filter(t => t.masterName === currentUser.name)
     : tasks;
 
   return (
@@ -169,8 +169,8 @@ const App: React.FC = () => {
               <div className="flex items-center gap-2">
                 <p className="text-xs text-slate-500 font-semibold">{filteredTasks.length} toplam görev</p>
                 {syncError && (
-                  <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold animate-pulse">
-                    SENKRONİZASYON HATASI
+                  <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">
+                    <i className="fas fa-cloud-slash mr-1"></i> BULUT SENKRONİZASYON BEKLİYOR
                   </span>
                 )}
               </div>
@@ -198,7 +198,7 @@ const App: React.FC = () => {
               )}
             </div>
           ) : (
-            <div>
+            <div className="pb-4">
               {filteredTasks.map(task => (
                 <TaskCard 
                   key={task.id} 
@@ -213,7 +213,7 @@ const App: React.FC = () => {
       )}
 
       {activeTab === 'add' && currentUser.role === 'AMIR' && (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
           <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-6">Yeni Görev Atama</h2>
           
           <form onSubmit={handleCreateTask} className="space-y-5 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
@@ -225,6 +225,7 @@ const App: React.FC = () => {
                 className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
                 value={newTaskMachine}
                 onChange={(e) => setNewTaskMachine(e.target.value)}
+                required
               />
             </div>
 
@@ -234,6 +235,7 @@ const App: React.FC = () => {
                 className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 appearance-none"
                 value={newTaskMaster}
                 onChange={(e) => setNewTaskMaster(e.target.value)}
+                required
               >
                 <option value="">Usta Seçin...</option>
                 {masters.map(m => <option key={m} value={m}>{m}</option>)}
@@ -242,23 +244,33 @@ const App: React.FC = () => {
 
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Öncelik</label>
-              <select 
-                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
-                value={newTaskPriority}
-                onChange={(e) => setNewTaskPriority(e.target.value as TaskPriority)}
-              >
-                {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.values(TaskPriority).map(p => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setNewTaskPriority(p)}
+                    className={`py-2 px-3 rounded-lg text-xs font-bold transition-all border ${
+                      newTaskPriority === p 
+                        ? 'bg-blue-600 text-white border-blue-600' 
+                        : 'bg-white text-slate-600 border-slate-200'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Görev Açıklaması / Talimatlar</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Görev Detayı</label>
               <textarea 
-                placeholder="Örn: Ana piston valfinde yağ sızıntısı var. Lütfen keçeleri değiştirin ve basınç testi yapın."
+                placeholder="Lütfen yapılacak işlemi detaylandırın..."
                 className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
-                rows={6}
+                rows={5}
                 value={newTaskDescription}
                 onChange={(e) => setNewTaskDescription(e.target.value)}
+                required
               />
             </div>
 
@@ -267,7 +279,7 @@ const App: React.FC = () => {
               className="w-full py-4 rounded-xl font-bold text-white shadow-xl shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2 bg-blue-600"
             >
               <i className="fas fa-paper-plane"></i>
-              GÖREVİ OLUŞTUR VE GÖNDER
+              GÖREVİ GÖNDER
             </button>
           </form>
         </div>
@@ -275,7 +287,7 @@ const App: React.FC = () => {
 
       {activeTab === 'profile' && (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-6">Ayarlar</h2>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-6">Profil ve Ayarlar</h2>
           
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
             <div className="p-6 flex items-center gap-4 border-b border-slate-100">
@@ -284,49 +296,30 @@ const App: React.FC = () => {
               </div>
               <div>
                 <h3 className="font-bold text-lg">{currentUser.name}</h3>
-                <p className="text-sm text-slate-500">{currentUser.role === 'AMIR' ? 'Hidrolik Birim Amiri' : 'Usta - Bakım Ekibi'}</p>
-              </div>
-            </div>
-            
-            <div className="p-4 bg-slate-50">
-              <div className="flex justify-between items-center py-2">
-                <span className="text-sm text-slate-600 font-medium">Birim</span>
-                <span className="text-sm font-bold text-slate-900">Hidrolik Güç Sistemleri</span>
-              </div>
-              <div className="flex justify-between items-center py-2">
-                <span className="text-sm text-slate-600 font-medium">Fabrika Kodu</span>
-                <span className="text-sm font-bold text-slate-900">TR-KOCAELI-04</span>
+                <p className="text-sm text-slate-500">{currentUser.role === 'AMIR' ? 'Birim Amiri' : 'Usta - Bakım Ekibi'}</p>
               </div>
             </div>
           </div>
 
           <div className="space-y-3">
-            <button className="w-full bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between font-bold text-slate-700 hover:bg-slate-50 transition-colors">
-              <div className="flex items-center gap-3">
-                <i className="fas fa-bell text-blue-500"></i>
-                Bildirim Ayarları
-              </div>
-              <i className="fas fa-chevron-right text-xs text-slate-300"></i>
-            </button>
-            <button className="w-full bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between font-bold text-slate-700 hover:bg-slate-50 transition-colors">
-              <div className="flex items-center gap-3">
-                <i className="fas fa-shield-halved text-emerald-500"></i>
-                Güvenlik Prosedürleri
-              </div>
-              <i className="fas fa-chevron-right text-xs text-slate-300"></i>
-            </button>
+             <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 text-emerald-800 text-sm">
+                <i className="fas fa-shield-check mr-2"></i>
+                Verileriniz cihazınıza otomatik kaydedilir. İnternet olduğunda bulut ile eşitlenir.
+             </div>
+
             <button 
               onClick={() => {
-                if(confirm("Tüm veriler silinecek, emin misiniz?")) {
+                if(confirm("TÜM GÖREV GEÇMİŞİ SİLİNECEK. Emin misiniz?")) {
                   saveTasks([]);
                   setTasks([]);
+                  alert("Tüm veriler temizlendi.");
                 }
               }}
               className="w-full bg-red-50 p-4 rounded-xl border border-red-100 flex items-center justify-between font-bold text-red-600 hover:bg-red-100 transition-colors mt-6"
             >
               <div className="flex items-center gap-3">
                 <i className="fas fa-trash-can"></i>
-                Tüm Geçmişi Temizle (Sıfırla)
+                Verileri Sıfırla
               </div>
             </button>
           </div>
