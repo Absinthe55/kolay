@@ -13,6 +13,12 @@ export enum TaskPriority {
   CRITICAL = 'Kritik'
 }
 
+export enum RequestStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED'
+}
+
 export interface Task {
   id: string;
   machineName: string;
@@ -28,6 +34,15 @@ export interface Task {
   completedImage?: string; // Görev bitirilirken eklenen resim
 }
 
+export interface UstaRequest {
+  id: string;
+  ustaName: string;
+  content: string;
+  status: RequestStatus;
+  createdAt: number;
+  responseNote?: string; // Yöneticinin notu
+}
+
 export interface User {
   id: string;
   name: string;
@@ -41,5 +56,6 @@ export interface Member {
 
 export interface AppState {
   tasks: Task[];
+  requests: UstaRequest[];
   currentUser: User | null;
 }

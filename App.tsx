@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Task, User, TaskStatus, TaskPriority, Member } from './types';
+import { Task, User, TaskStatus, TaskPriority, Member, UstaRequest, RequestStatus } from './types';
 import { fetchAppData, saveAppData, createNewBin, getStoredBinId, setStoredBinId, extractBinId, checkConnection } from './services/dbService';
 import Layout from './components/Layout';
 import TaskCard from './components/TaskCard';
@@ -26,11 +26,12 @@ const AUTO_CONNECT_URL = 'https://www.npoint.io/docs/c85115e1d1b4c3276a86';
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [requests, setRequests] = useState<UstaRequest[]>([]);
   const [amirList, setAmirList] = useState<Member[]>(DEFAULT_AMIRS);
   const [ustaList, setUstaList] = useState<Member[]>(DEFAULT_USTAS);
   
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tasks' | 'add' | 'profile'>('tasks');
+  const [activeTab, setActiveTab] = useState<'tasks' | 'add' | 'profile' | 'requests'>('tasks');
   const [connectionId, setConnectionId] = useState(getStoredBinId());
   
   // Personel Yönetimi State'leri
@@ -47,13 +48,16 @@ const App: React.FC = () => {
   const [loginPasswordInput, setLoginPasswordInput] = useState('');
   const [loginError, setLoginError] = useState(false);
 
-  // Form State
+  // Task Form State
   const [newTaskMachine, setNewTaskMachine] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskMaster, setNewTaskMaster] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
   const [newTaskImage, setNewTaskImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Request Form State
+  const [newRequestContent, setNewRequestContent] = useState('');
 
   // Veri Yükleme
   const loadData = useCallback(async (forceId?: string) => {
@@ -62,6 +66,7 @@ const App: React.FC = () => {
     const data = await fetchAppData(targetId);
     
     setTasks(data.tasks);
+    setRequests(data.requests);
     // Eğer sunucudan liste gelmişse güncelle, yoksa varsayılanları koru
     if (data.amirs && data.amirs.length > 0) setAmirList(data.amirs);
     if (data.ustas && data.ustas.length > 0) setUstaList(data.ustas);
@@ -86,6 +91,7 @@ const App: React.FC = () => {
              setConnectionId(autoId);
              const data = await fetchAppData(autoId);
              setTasks(data.tasks);
+             setRequests(data.requests);
              if (data.amirs.length > 0) setAmirList(data.amirs);
              if (data.ustas.length > 0) setUstaList(data.ustas);
           }
@@ -98,6 +104,7 @@ const App: React.FC = () => {
       if (connectionId) {
         fetchAppData(connectionId).then(data => {
             setTasks(data.tasks);
+            setRequests(data.requests);
             if (data.amirs.length > 0) setAmirList(data.amirs);
             if (data.ustas.length > 0) setUstaList(data.ustas);
         });
@@ -216,7 +223,7 @@ const App: React.FC = () => {
         setUstaList(newUstas);
     }
 
-    await saveAppData({ tasks, amirs: newAmirs, ustas: newUstas }, connectionId);
+    await saveAppData({ tasks, requests, amirs: newAmirs, ustas: newUstas }, connectionId);
     setNewMemberName('');
     setNewMemberPassword('');
     setLoading(false);
@@ -238,7 +245,7 @@ const App: React.FC = () => {
           setUstaList(newUstas);
       }
       
-      await saveAppData({ tasks, amirs: newAmirs, ustas: newUstas }, connectionId);
+      await saveAppData({ tasks, requests, amirs: newAmirs, ustas: newUstas }, connectionId);
       setLoading(false);
   };
 
@@ -265,7 +272,7 @@ const App: React.FC = () => {
         setUstaList(newUstas);
     }
 
-    await saveAppData({ tasks, amirs: newAmirs, ustas: newUstas }, connectionId);
+    await saveAppData({ tasks, requests, amirs: newAmirs, ustas: newUstas }, connectionId);
     setLoading(false);
     setPasswordChangeModal(null);
     setNewPasswordInput('');
@@ -325,7 +332,7 @@ const App: React.FC = () => {
     setTasks(updatedTasks);
     
     setLoading(true);
-    await saveAppData({ tasks: updatedTasks, amirs: amirList, ustas: ustaList }, connectionId);
+    await saveAppData({ tasks: updatedTasks, requests, amirs: amirList, ustas: ustaList }, connectionId);
     setLoading(false);
     
     setNewTaskMachine('');
@@ -356,7 +363,7 @@ const App: React.FC = () => {
     });
     
     setTasks(updatedTasks);
-    await saveAppData({ tasks: updatedTasks, amirs: amirList, ustas: ustaList }, connectionId);
+    await saveAppData({ tasks: updatedTasks, requests, amirs: amirList, ustas: ustaList }, connectionId);
     setLoading(false);
   };
 
@@ -366,8 +373,56 @@ const App: React.FC = () => {
     setLoading(true);
     const updatedTasks = tasks.filter(t => t.id !== taskId);
     setTasks(updatedTasks);
-    await saveAppData({ tasks: updatedTasks, amirs: amirList, ustas: ustaList }, connectionId);
+    await saveAppData({ tasks: updatedTasks, requests, amirs: amirList, ustas: ustaList }, connectionId);
     setLoading(false);
+  };
+
+  // USTA TALEP OLUŞTURMA
+  const handleCreateRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRequestContent.trim() || !currentUser) return;
+
+    const newRequest: UstaRequest = {
+      id: Date.now().toString(),
+      ustaName: currentUser.name,
+      content: newRequestContent,
+      status: RequestStatus.PENDING,
+      createdAt: Date.now()
+    };
+
+    const updatedRequests = [newRequest, ...requests];
+    setRequests(updatedRequests);
+    
+    setLoading(true);
+    await saveAppData({ tasks, requests: updatedRequests, amirs: amirList, ustas: ustaList }, connectionId);
+    setLoading(false);
+    
+    setNewRequestContent('');
+    alert("Talebiniz yöneticiye iletildi.");
+  };
+
+  // TALEP DURUM GÜNCELLEME (AMİR)
+  const handleRequestStatus = async (reqId: string, status: RequestStatus) => {
+    setLoading(true);
+    const updatedRequests = requests.map(r => {
+        if (r.id === reqId) {
+            return { ...r, status };
+        }
+        return r;
+    });
+    setRequests(updatedRequests);
+    await saveAppData({ tasks, requests: updatedRequests, amirs: amirList, ustas: ustaList }, connectionId);
+    setLoading(false);
+  };
+
+  // TALEP SİLME (AMİR veya USTA (Pending ise))
+  const handleDeleteRequest = async (reqId: string) => {
+      if(!confirm("Bu talebi silmek istediğinize emin misiniz?")) return;
+      setLoading(true);
+      const updatedRequests = requests.filter(r => r.id !== reqId);
+      setRequests(updatedRequests);
+      await saveAppData({ tasks, requests: updatedRequests, amirs: amirList, ustas: ustaList }, connectionId);
+      setLoading(false);
   };
 
   if (!currentUser) {
@@ -472,6 +527,11 @@ const App: React.FC = () => {
     ? tasks.filter(t => t.masterName === currentUser.name)
     : tasks;
 
+  // Talepleri filtrele: Usta ise sadece kendininkileri, Amir ise hepsini görsün.
+  const filteredRequests = currentUser.role === 'USTA'
+    ? requests.filter(r => r.ustaName === currentUser.name)
+    : requests;
+
   const isErkan = currentUser.name === 'Birim Amiri ERKAN ÇİLİNGİR';
 
   return (
@@ -518,6 +578,96 @@ const App: React.FC = () => {
             </div>
           )}
         </div>
+      )}
+
+      {/* YENİ TALEP SEKME İÇERİĞİ */}
+      {activeTab === 'requests' && (
+         <div className="animate-in fade-in duration-500 pb-24">
+            <h2 className="text-3xl font-black text-slate-100 tracking-tight mb-6 px-1">
+                {currentUser.role === 'AMIR' ? 'Gelen Talepler' : 'Taleplerim'}
+            </h2>
+
+            {/* USTA: Yeni Talep Formu */}
+            {currentUser.role === 'USTA' && (
+                <div className="bg-slate-800 p-6 rounded-[2rem] border border-slate-700 shadow-xl shadow-slate-900/50 mb-8">
+                     <h3 className="font-bold text-slate-200 mb-4 flex items-center gap-2">
+                         <i className="fas fa-edit text-orange-500"></i>
+                         Yeni Talep Oluştur
+                     </h3>
+                     <form onSubmit={handleCreateRequest}>
+                         <textarea 
+                            className="w-full bg-slate-900 border border-slate-600 rounded-xl p-4 text-sm mb-4 focus:ring-2 focus:ring-orange-500 focus:bg-slate-900 outline-none transition-all placeholder:text-slate-600 text-white min-h-[100px]"
+                            placeholder="Parça isteği, izin, öneri vb..."
+                            value={newRequestContent}
+                            onChange={(e) => setNewRequestContent(e.target.value)}
+                         ></textarea>
+                         <button 
+                            disabled={loading || !newRequestContent.trim()}
+                            className="w-full bg-gradient-to-r from-orange-600 to-amber-600 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-orange-900/40 hover:shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                         >
+                            <span>GÖNDER</span>
+                            <i className="fas fa-paper-plane"></i>
+                         </button>
+                     </form>
+                </div>
+            )}
+
+            {/* Talep Listesi */}
+            <div className="space-y-4">
+                {filteredRequests.length === 0 ? (
+                    <div className="text-center py-10">
+                        <i className="fas fa-inbox text-4xl text-slate-700 mb-3"></i>
+                        <p className="text-slate-500 font-bold">Henüz bir talep bulunmuyor.</p>
+                    </div>
+                ) : (
+                    filteredRequests.sort((a,b) => b.createdAt - a.createdAt).map(req => (
+                        <div key={req.id} className="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-md relative overflow-hidden group">
+                            {/* Sol Kenar Durum Çubuğu */}
+                            <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${req.status === RequestStatus.PENDING ? 'bg-yellow-500' : req.status === RequestStatus.APPROVED ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                            
+                            <div className="pl-3">
+                                <div className="flex justify-between items-start mb-2">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase ${req.status === RequestStatus.PENDING ? 'bg-yellow-900/30 text-yellow-500 border border-yellow-800' : req.status === RequestStatus.APPROVED ? 'bg-emerald-900/30 text-emerald-500 border border-emerald-800' : 'bg-red-900/30 text-red-500 border border-red-800'}`}>
+                                                {req.status === RequestStatus.PENDING ? 'BEKLEMEDE' : req.status === RequestStatus.APPROVED ? 'ONAYLANDI' : 'REDDEDİLDİ'}
+                                            </span>
+                                            <span className="text-[10px] text-slate-500 font-mono">
+                                                {new Date(req.createdAt).toLocaleDateString('tr-TR')}
+                                            </span>
+                                        </div>
+                                        {currentUser.role === 'AMIR' && (
+                                            <p className="text-xs font-bold text-blue-400 mb-1">{req.ustaName}</p>
+                                        )}
+                                    </div>
+                                    {(currentUser.role === 'AMIR' || (currentUser.role === 'USTA' && req.status === RequestStatus.PENDING)) && (
+                                         <button onClick={() => handleDeleteRequest(req.id)} className="w-8 h-8 rounded-full bg-slate-700 hover:bg-red-900/50 text-slate-500 hover:text-red-400 flex items-center justify-center transition-colors">
+                                            <i className="fas fa-trash-alt text-xs"></i>
+                                         </button>
+                                    )}
+                                </div>
+                                
+                                <p className="text-sm text-slate-300 font-medium leading-relaxed bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 mb-3">
+                                    {req.content}
+                                </p>
+
+                                {/* AMİR AKSİYON BUTONLARI */}
+                                {currentUser.role === 'AMIR' && req.status === RequestStatus.PENDING && (
+                                    <div className="flex gap-3 mt-3 border-t border-slate-700 pt-3">
+                                        <button onClick={() => handleRequestStatus(req.id, RequestStatus.REJECTED)} className="flex-1 py-2 rounded-lg bg-red-900/20 text-red-400 border border-red-900/50 text-xs font-bold hover:bg-red-900/40 transition-colors">
+                                            REDDET
+                                        </button>
+                                        <button onClick={() => handleRequestStatus(req.id, RequestStatus.APPROVED)} className="flex-[2] py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 shadow-lg shadow-emerald-900/20 transition-colors">
+                                            ONAYLA
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+         </div>
       )}
 
       {activeTab === 'add' && currentUser.role === 'AMIR' && (
