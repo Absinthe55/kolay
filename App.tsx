@@ -38,6 +38,10 @@ const App: React.FC = () => {
   const [newMemberPassword, setNewMemberPassword] = useState('');
   const [newMemberRole, setNewMemberRole] = useState<'AMIR' | 'USTA'>('USTA');
 
+  // Şifre Değiştirme Modal State
+  const [passwordChangeModal, setPasswordChangeModal] = useState<{show: boolean, memberName: string, role: 'AMIR' | 'USTA'} | null>(null);
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+
   // Login State
   const [loginModal, setLoginModal] = useState<{show: boolean, member: Member | null, role: 'AMIR' | 'USTA'} | null>(null);
   const [loginPasswordInput, setLoginPasswordInput] = useState('');
@@ -236,6 +240,36 @@ const App: React.FC = () => {
       
       await saveAppData({ tasks, amirs: newAmirs, ustas: newUstas }, connectionId);
       setLoading(false);
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordChangeModal) return;
+
+    setLoading(true);
+    let newAmirs = [...amirList];
+    let newUstas = [...ustaList];
+
+    const updateList = (list: Member[]) => list.map(m => {
+        if (m.name === passwordChangeModal.memberName) {
+            return { ...m, password: newPasswordInput.trim() || undefined };
+        }
+        return m;
+    });
+
+    if (passwordChangeModal.role === 'AMIR') {
+        newAmirs = updateList(newAmirs);
+        setAmirList(newAmirs);
+    } else {
+        newUstas = updateList(newUstas);
+        setUstaList(newUstas);
+    }
+
+    await saveAppData({ tasks, amirs: newAmirs, ustas: newUstas }, connectionId);
+    setLoading(false);
+    setPasswordChangeModal(null);
+    setNewPasswordInput('');
+    alert("Şifre güncellendi.");
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -640,11 +674,22 @@ const App: React.FC = () => {
                                            {member.name}
                                            {member.password && <i className="fas fa-lock text-slate-300 ml-1" title="Şifreli"></i>}
                                        </span>
-                                       {member.name !== currentUser.name && (
-                                           <button onClick={() => handleRemoveMember(member.name, 'AMIR')} className="w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center">
-                                               <i className="fas fa-trash-alt text-[10px]"></i>
-                                           </button>
-                                       )}
+                                       <div className="flex items-center gap-2">
+                                            {member.name !== currentUser.name && (
+                                                <button 
+                                                    onClick={() => { setPasswordChangeModal({show: true, memberName: member.name, role: 'AMIR'}); setNewPasswordInput(''); }}
+                                                    className="w-6 h-6 rounded-full bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-colors flex items-center justify-center"
+                                                    title="Şifre Değiştir"
+                                                >
+                                                    <i className="fas fa-key text-[10px]"></i>
+                                                </button>
+                                            )}
+                                            {member.name !== currentUser.name && (
+                                                <button onClick={() => handleRemoveMember(member.name, 'AMIR')} className="w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center">
+                                                    <i className="fas fa-trash-alt text-[10px]"></i>
+                                                </button>
+                                            )}
+                                       </div>
                                    </li>
                                ))}
                            </ul>
@@ -659,9 +704,18 @@ const App: React.FC = () => {
                                            {member.name}
                                            {member.password && <i className="fas fa-lock text-slate-300 ml-1" title="Şifreli"></i>}
                                        </span>
-                                       <button onClick={() => handleRemoveMember(member.name, 'USTA')} className="w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center">
-                                           <i className="fas fa-trash-alt text-[10px]"></i>
-                                       </button>
+                                       <div className="flex items-center gap-2">
+                                            <button 
+                                                onClick={() => { setPasswordChangeModal({show: true, memberName: member.name, role: 'USTA'}); setNewPasswordInput(''); }}
+                                                className="w-6 h-6 rounded-full bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-colors flex items-center justify-center"
+                                                title="Şifre Değiştir"
+                                            >
+                                                <i className="fas fa-key text-[10px]"></i>
+                                            </button>
+                                            <button onClick={() => handleRemoveMember(member.name, 'USTA')} className="w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center">
+                                                <i className="fas fa-trash-alt text-[10px]"></i>
+                                            </button>
+                                       </div>
                                    </li>
                                ))}
                            </ul>
@@ -689,6 +743,45 @@ const App: React.FC = () => {
               </div>
            </div>
         </div>
+      )}
+
+      {/* Şifre Değiştirme Modalı */}
+      {passwordChangeModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
+              <div className="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl scale-100 animate-in zoom-in-95 duration-200 relative overflow-hidden">
+                   <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+                  <div className="text-center mb-6">
+                      <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner">
+                          <i className="fas fa-key text-2xl"></i>
+                      </div>
+                      <h3 className="text-lg font-black text-slate-800">Şifre Güncelle</h3>
+                      <p className="text-sm text-slate-500 font-medium">{passwordChangeModal.memberName}</p>
+                  </div>
+
+                  <form onSubmit={handleChangePassword}>
+                      <div className="mb-4">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Yeni Şifre</label>
+                        <input 
+                            type="text" 
+                            autoFocus
+                            placeholder="Yeni şifre (Boş bırakılırsa kaldırılır)" 
+                            className="w-full text-center font-bold p-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white outline-none transition-all"
+                            value={newPasswordInput}
+                            onChange={(e) => setNewPasswordInput(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 mt-4">
+                          <button type="button" onClick={() => { setPasswordChangeModal(null); setNewPasswordInput(''); }} className="py-3 rounded-xl font-bold text-sm text-slate-500 bg-slate-100 hover:bg-slate-200">
+                              Vazgeç
+                          </button>
+                          <button type="submit" className="py-3 rounded-xl font-bold text-sm text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200">
+                              Kaydet
+                          </button>
+                      </div>
+                  </form>
+              </div>
+          </div>
       )}
     </Layout>
   );
