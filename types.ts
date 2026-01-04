@@ -52,6 +52,7 @@ export interface User {
 export interface Member {
   name: string;
   password?: string;
+  phoneNumber?: string; // Whatsapp için telefon numarası
 }
 
 export interface AppState {

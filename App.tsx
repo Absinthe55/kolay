@@ -41,6 +41,7 @@ const App: React.FC = () => {
   // Personel Yönetimi State'leri
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberPassword, setNewMemberPassword] = useState('');
+  const [newMemberPhone, setNewMemberPhone] = useState('');
   const [newMemberRole, setNewMemberRole] = useState<'AMIR' | 'USTA'>('USTA');
 
   // Şifre Değiştirme Modal State
@@ -359,9 +360,18 @@ const App: React.FC = () => {
     let newAmirs = [...amirList];
     let newUstas = [...ustaList];
 
+    // Telefon numarasını temizle (başında 0 varsa sil, boşlukları sil)
+    let cleanedPhone = newMemberPhone.trim();
+    if (cleanedPhone) {
+        cleanedPhone = cleanedPhone.replace(/\D/g, ''); // Sadece rakamlar
+        if (cleanedPhone.startsWith('0')) cleanedPhone = cleanedPhone.substring(1);
+        if (cleanedPhone.length === 10) cleanedPhone = '90' + cleanedPhone;
+    }
+
     const newMember: Member = {
         name: newMemberName.trim(),
-        password: newMemberPassword.trim() || undefined
+        password: newMemberPassword.trim() || undefined,
+        phoneNumber: cleanedPhone || undefined
     };
 
     if (newMemberRole === 'AMIR') {
@@ -375,6 +385,7 @@ const App: React.FC = () => {
     await saveAppData({ tasks, requests, amirs: newAmirs, ustas: newUstas }, connectionId);
     setNewMemberName('');
     setNewMemberPassword('');
+    setNewMemberPhone('');
     setLoading(false);
     alert(`${newMember.name} listeye eklendi.`);
   };
@@ -486,12 +497,26 @@ const App: React.FC = () => {
     await saveAppData({ tasks: updatedTasks, requests, amirs: amirList, ustas: ustaList }, connectionId);
     setLoading(false);
     
+    // WHATSAPP ENTEGRASYONU
+    const assignedUsta = ustaList.find(u => u.name === newTaskMaster);
+    if (assignedUsta && assignedUsta.phoneNumber) {
+        // Whatsapp Link Oluşturma
+        const message = `*🔧 YENİ HİDROLİK GÖREVİ*\n\n*Makine:* ${newTaskMachine}\n*Öncelik:* ${newTaskPriority}\n*İş Emri:* ${newTaskDescription}\n\nLütfen HidroGörev uygulamasından onaylayınız.`;
+        const waUrl = `https://wa.me/${assignedUsta.phoneNumber}?text=${encodeURIComponent(message)}`;
+        
+        // Kullanıcıya sor veya direkt aç (Mobil tarayıcılarda pop-up engelleyici olabilir, bu yüzden confirm kullanıyoruz)
+        if(confirm(`${newTaskMaster} adlı ustaya WhatsApp bildirimi gönderilsin mi?`)) {
+            window.open(waUrl, '_blank');
+        }
+    } else {
+        alert("Görev yayınlandı. (Ustanın telefon numarası kayıtlı olmadığı için WhatsApp açılmadı)");
+    }
+    
     setNewTaskMachine('');
     setNewTaskDescription('');
     setNewTaskMaster('');
     setNewTaskImage(null);
     if(fileInputRef.current) fileInputRef.current.value = '';
-    alert("Görev yayınlandı.");
     setActiveTab('tasks');
   };
 
@@ -898,10 +923,17 @@ const App: React.FC = () => {
                                />
                                <input 
                                    type="text" 
-                                   placeholder="Şifre (İsteğe Bağlı)" 
+                                   placeholder="Şifre" 
                                    className="p-3.5 rounded-xl border-0 bg-slate-800 ring-1 ring-slate-700 text-sm w-full font-bold focus:ring-2 focus:ring-blue-500 outline-none text-slate-100 placeholder:text-slate-600"
                                    value={newMemberPassword}
                                    onChange={(e) => setNewMemberPassword(e.target.value)}
+                               />
+                               <input 
+                                   type="tel" 
+                                   placeholder="Telefon (5XXXXXXXXX)" 
+                                   className="p-3.5 col-span-2 rounded-xl border-0 bg-slate-800 ring-1 ring-slate-700 text-sm w-full font-bold focus:ring-2 focus:ring-blue-500 outline-none text-slate-100 placeholder:text-slate-600"
+                                   value={newMemberPhone}
+                                   onChange={(e) => setNewMemberPhone(e.target.value)}
                                />
                            </div>
                            <div className="flex gap-2">
@@ -933,6 +965,7 @@ const App: React.FC = () => {
                                            <div className="w-2 h-2 rounded-full bg-blue-500"></div> 
                                            {member.name}
                                            {member.password && <i className="fas fa-lock text-slate-600 ml-1" title="Şifreli"></i>}
+                                           {member.phoneNumber && <i className="fab fa-whatsapp text-emerald-500 ml-1" title={member.phoneNumber}></i>}
                                        </span>
                                        <div className="flex items-center gap-2">
                                             {member.name !== currentUser.name && (
@@ -963,6 +996,7 @@ const App: React.FC = () => {
                                            <div className="w-2 h-2 rounded-full bg-emerald-500"></div> 
                                            {member.name}
                                            {member.password && <i className="fas fa-lock text-slate-600 ml-1" title="Şifreli"></i>}
+                                           {member.phoneNumber && <i className="fab fa-whatsapp text-emerald-500 ml-1" title={member.phoneNumber}></i>}
                                        </span>
                                        <div className="flex items-center gap-2">
                                             <button 
