@@ -174,6 +174,22 @@ export const archiveDeletedTask = async (task: Task) => {
   }
 };
 
+// Arşivlenmiş (Silinmiş) Görevleri Çeker
+export const fetchArchivedTasks = async (): Promise<Task[]> => {
+    const url = getProviderUrl(ARCHIVE_BIN_ID);
+    try {
+        const response = await fetch(url);
+        if (response.ok) {
+            const data = await response.json();
+            if (Array.isArray(data)) return data;
+            if (data && Array.isArray(data.deletedTasks)) return data.deletedTasks;
+        }
+    } catch (e) {
+        console.error("Arşiv çekme hatası:", e);
+    }
+    return [];
+};
+
 // Tüm verileri (Görevler + Personel Listesi) çeker
 export const fetchAppData = async (binId?: string): Promise<AppData> => {
   const id = binId || getStoredBinId();

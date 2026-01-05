@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Task, User, TaskStatus, TaskPriority, Member, UstaRequest, RequestStatus, LeaveRequest } from './types';
-import { fetchAppData, saveAppData, createNewBin, getStoredBinId, setStoredBinId, extractBinId, checkConnection, archiveDeletedTask } from './services/dbService';
+import { fetchAppData, saveAppData, createNewBin, getStoredBinId, setStoredBinId, extractBinId, checkConnection, archiveDeletedTask, fetchArchivedTasks } from './services/dbService';
 import Layout from './components/Layout';
 import TaskCard from './components/TaskCard';
 import CalendarView from './components/CalendarView';
@@ -19,9 +19,12 @@ const NOTIFICATION_SOUND = 'https://assets.mixkit.co/active_storage/sfx/2869/286
 // Grup Resmi URL
 const GROUP_IMAGE_URL = 'https://cdn-icons-png.flaticon.com/512/3652/3652191.png'; // Buraya ekteki resmin URL'sini koyabilirsiniz.
 
+type TaskTab = 'active' | 'history' | 'deleted';
+
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [archivedTasks, setArchivedTasks] = useState<Task[]>([]); // Silinenler için
   const [requests, setRequests] = useState<UstaRequest[]>([]);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [amirList, setAmirList] = useState<Member[]>(DEFAULT_AMIRS);
@@ -29,6 +32,8 @@ const App: React.FC = () => {
   
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'tasks' | 'add' | 'profile' | 'requests' | 'calendar'>('tasks');
+  const [activeTaskTab, setActiveTaskTab] = useState<TaskTab>('active'); // Görevler alt sekmeleri
+
   const [connectionId, setConnectionId] = useState(getStoredBinId());
   
   // Personel Yönetimi State'leri
@@ -158,6 +163,17 @@ const App: React.FC = () => {
     
     setLoading(false);
   }, [connectionId]);
+
+  // Silinenler sekmesine geçildiğinde arşiv verilerini çek
+  useEffect(() => {
+      if (activeTaskTab === 'deleted') {
+          setLoading(true);
+          fetchArchivedTasks().then(data => {
+              setArchivedTasks(data);
+              setLoading(false);
+          });
+      }
+  }, [activeTaskTab]);
 
   // Online Heartbeat (Her 60 saniyede bir lastActive günceller)
   useEffect(() => {
@@ -881,9 +897,33 @@ const App: React.FC = () => {
     );
   }
 
-  const filteredTasks = currentUser.role === 'USTA' 
-    ? tasks.filter(t => t.masterName === currentUser.name)
-    : tasks;
+  // Görevleri sekmeye göre filtreleme mantığı
+  const getFilteredTasks = () => {
+      // 1. Önce kullanıcı rolüne göre filtrele (Usta sadece kendi işlerini görür, silinenler hariç)
+      // Ancak "Silinenler" sekmesinde ustalar da sadece kendi silinenlerini görmeli mi?
+      // Varsayım: Ustalar sadece kendi aktif/geçmiş işlerini görür. Silinenler genelde yönetici içindir ama usta da görebilsin kendi sildiklerini.
+      
+      let sourceTasks = tasks;
+      if (activeTaskTab === 'deleted') {
+          sourceTasks = archivedTasks;
+      }
+
+      let userFiltered = currentUser.role === 'USTA' 
+        ? sourceTasks.filter(t => t.masterName === currentUser.name)
+        : sourceTasks;
+
+      // 2. Sekmeye göre durum filtresi
+      if (activeTaskTab === 'active') {
+          return userFiltered.filter(t => t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.CANCELLED);
+      } else if (activeTaskTab === 'history') {
+          return userFiltered.filter(t => t.status === TaskStatus.COMPLETED || t.status === TaskStatus.CANCELLED);
+      } else {
+          // deleted
+          return userFiltered; // Zaten archivedTasks'dan geliyor
+      }
+  };
+
+  const filteredTasks = getFilteredTasks();
 
   // Talepleri filtrele: Usta ise sadece kendininkileri, Amir ise hepsini görsün.
   const filteredRequests = currentUser.role === 'USTA'
@@ -903,7 +943,7 @@ const App: React.FC = () => {
 
       {activeTab === 'tasks' && (
         <div className="animate-in fade-in duration-500 pb-24">
-          <div className="flex justify-between items-end mb-8 px-1">
+          <div className="flex justify-between items-end mb-6 px-1">
             <div>
                 <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Hoş Geldiniz,</p>
                 <h2 className="text-3xl font-black text-slate-100 tracking-tight leading-none">{currentUser.name.split(' ')[0]} Bey</h2>
@@ -912,12 +952,42 @@ const App: React.FC = () => {
                 <i className="fas fa-sync-alt"></i>
             </button>
           </div>
+
+          {/* Görev Sekmeleri */}
+          <div className="flex bg-slate-800/50 p-1 rounded-2xl mb-6 border border-slate-800">
+              <button 
+                  onClick={() => setActiveTaskTab('active')} 
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${activeTaskTab === 'active' ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
+              >
+                  Aktif
+              </button>
+              <button 
+                  onClick={() => setActiveTaskTab('history')} 
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${activeTaskTab === 'history' ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
+              >
+                  Geçmiş
+              </button>
+              <button 
+                  onClick={() => setActiveTaskTab('deleted')} 
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${activeTaskTab === 'deleted' ? 'bg-red-900/20 text-red-400 shadow-md border border-red-900/30' : 'text-slate-500 hover:text-slate-300'}`}
+              >
+                  Silinenler
+              </button>
+          </div>
           
           <div className="space-y-6">
-            {filteredTasks.length === 0 ? (
+            {loading && activeTaskTab === 'deleted' ? (
+                <div className="text-center py-10">
+                    <i className="fas fa-spinner fa-spin text-2xl text-slate-500 mb-2"></i>
+                    <p className="text-slate-500 text-xs">Arşiv yükleniyor...</p>
+                </div>
+            ) : filteredTasks.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 opacity-50 text-slate-600">
-                    <i className="fas fa-clipboard-list text-6xl mb-4"></i>
-                    <p className="font-bold">Henüz görev yok</p>
+                    <i className={`fas ${activeTaskTab === 'deleted' ? 'fa-trash' : 'fa-clipboard-list'} text-6xl mb-4`}></i>
+                    <p className="font-bold">
+                        {activeTaskTab === 'active' ? 'Aktif görev yok' : 
+                         activeTaskTab === 'history' ? 'Tamamlanan görev yok' : 'Silinen görev yok'}
+                    </p>
                 </div>
             ) : (
                 filteredTasks.map(task => (
@@ -928,6 +998,7 @@ const App: React.FC = () => {
                         onUpdateStatus={updateTaskStatus}
                         onDelete={handleDeleteTask}
                         onMarkSeen={handleMarkTaskSeen}
+                        isArchived={activeTaskTab === 'deleted'}
                     />
                 ))
             )}
@@ -945,6 +1016,7 @@ const App: React.FC = () => {
           />
       )}
 
+      {/* ... (Diğer tab içerikleri add, requests, profile aynı kalacak) ... */}
       {activeTab === 'add' && currentUser.role === 'AMIR' && (
         <div className="animate-in slide-in-from-bottom-4 duration-500 pb-24">
             <h2 className="text-2xl font-black text-slate-100 mb-6 px-1">Yeni İş Emri</h2>

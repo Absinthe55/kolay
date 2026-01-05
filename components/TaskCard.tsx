@@ -8,21 +8,22 @@ interface TaskCardProps {
   onUpdateStatus: (taskId: string, newStatus: TaskStatus, comment?: string, completedImage?: string) => void;
   onDelete?: (taskId: string) => void;
   onMarkSeen?: (taskId: string) => void;
+  isArchived?: boolean;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelete, onMarkSeen }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelete, onMarkSeen, isArchived = false }) => {
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [comment, setComment] = useState('');
   const [completedImage, setCompletedImage] = useState<string | null>(null);
   const [isImageExpanded, setIsImageExpanded] = useState<{url: string, title: string} | null>(null);
-  const [isCollapsed, setIsCollapsed] = useState(task.status === TaskStatus.COMPLETED || task.status === TaskStatus.CANCELLED);
+  const [isCollapsed, setIsCollapsed] = useState(task.status === TaskStatus.COMPLETED || task.status === TaskStatus.CANCELLED || isArchived);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Otomatik Görüldü İşaretleme
-  // Kart açıksa (isCollapsed false) ve bakan kişi yetkili ustaysa, 1.5 saniye sonra görüldü işaretle
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
-    if (!isCollapsed && user.role === 'USTA' && task.masterName === user.name && !task.seenAt && onMarkSeen) {
+    // Arşivlenmişse veya collapsed ise işaretleme
+    if (!isCollapsed && !isArchived && user.role === 'USTA' && task.masterName === user.name && !task.seenAt && onMarkSeen) {
         timer = setTimeout(() => {
             onMarkSeen(task.id);
         }, 1500);
@@ -30,7 +31,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
     return () => {
         if (timer) clearTimeout(timer);
     };
-  }, [isCollapsed, user.role, task.masterName, user.name, task.seenAt, task.id, onMarkSeen]);
+  }, [isCollapsed, user.role, task.masterName, user.name, task.seenAt, task.id, onMarkSeen, isArchived]);
 
   // Modern Dark Mode Renk Paletleri
   const statusConfig = {
@@ -65,6 +66,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
   };
 
   const handleStatusChange = () => {
+    if (isArchived) return;
     if (task.status === TaskStatus.PENDING) {
       onUpdateStatus(task.id, TaskStatus.IN_PROGRESS);
     } else if (task.status === TaskStatus.IN_PROGRESS) {
@@ -78,13 +80,14 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
     setIsCollapsed(newCollapsed);
 
     // Tıklayarak açtığında da hemen tetikle (yedek kontrol)
-    if (!newCollapsed && user.role === 'USTA' && task.masterName === user.name && !task.seenAt && onMarkSeen) {
+    if (!newCollapsed && !isArchived && user.role === 'USTA' && task.masterName === user.name && !task.seenAt && onMarkSeen) {
         onMarkSeen(task.id);
     }
   };
 
   const handleCancelTask = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isArchived) return;
     if (confirm('Bu görevi iptal etmek istediğinize emin misiniz?')) {
       onUpdateStatus(task.id, TaskStatus.CANCELLED, 'Yönetici tarafından iptal edildi.');
     }
@@ -92,6 +95,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
 
   const handleDeleteTask = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isArchived) return; // Arşivlenmiş görev buradan silinmez (veya farklı logic)
     if (onDelete) onDelete(task.id);
   };
 
@@ -137,9 +141,8 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
   const currentStatus = statusConfig[task.status];
   const currentPriority = priorityConfig[task.priority];
 
-  // Görüldü Bilgisi Render Fonksiyonu
   const renderSeenStatus = () => {
-    if (user.role !== 'AMIR') return null;
+    if (user.role !== 'AMIR' && !isArchived) return null;
 
     if (task.seenAt) {
         return (
@@ -160,15 +163,22 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
 
   return (
     <>
-      <div className={`bg-slate-800 rounded-[1.25rem] shadow-lg transition-all duration-300 border border-slate-700 overflow-hidden relative ${isCancelled ? 'opacity-60 grayscale-[0.8]' : ''}`}>
+      <div className={`bg-slate-800 rounded-[1.25rem] shadow-lg transition-all duration-300 border ${isArchived ? 'border-red-900/30 bg-slate-800/50' : 'border-slate-700'} overflow-hidden relative ${isCancelled || isArchived ? 'opacity-75 grayscale-[0.6]' : ''}`}>
         
-        {/* Sol Kenar Çizgisi (Renkli Bar) */}
-        <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${currentStatus.bg.replace('/30', '').replace('bg-', 'bg-').replace('-900', '-500')}`}></div>
+        {/* Sol Kenar Çizgisi */}
+        <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${isArchived ? 'bg-red-900' : currentStatus.bg.replace('/30', '').replace('bg-', 'bg-').replace('-900', '-500')}`}></div>
+
+        {/* Silinmiş Etiketi (Overlay) */}
+        {isArchived && (
+            <div className="absolute top-2 right-14 rotate-12 z-10 border-2 border-red-500 text-red-500 font-black text-xs px-2 py-1 rounded opacity-60">
+                SİLİNDİ
+            </div>
+        )}
 
         {/* Header - Tıklanabilir Alan */}
         <div 
           onClick={handleToggleCollapse} 
-          className={`relative pl-5 pr-4 py-4 cursor-pointer select-none bg-slate-800`}
+          className={`relative pl-5 pr-4 py-4 cursor-pointer select-none bg-slate-800 ${isArchived ? 'bg-slate-900/30' : ''}`}
         >
           <div className="flex justify-between items-start">
             <div className="flex-1 pr-2">
@@ -196,8 +206,8 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
 
             {/* Sağ Üst Aksiyonlar */}
             <div className="flex flex-col items-end gap-2">
-                 {/* Amir Aksiyonları */}
-                 {user.role === 'AMIR' && (
+                 {/* Amir Aksiyonları - Arşivdeyse gösterme */}
+                 {user.role === 'AMIR' && !isArchived && (
                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         {!isCancelled && task.status !== TaskStatus.COMPLETED && (
                             <button onClick={handleCancelTask} className="w-8 h-8 rounded-full bg-red-900/30 text-red-400 flex items-center justify-center hover:bg-red-600 hover:text-white transition-colors" title="İptal Et">
@@ -233,7 +243,11 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                     <span className="text-[10px] font-medium text-slate-500">
                         {new Date(task.createdAt).toLocaleDateString('tr-TR')}
                     </span>
-                    {renderSeenStatus()}
+                    {isArchived && task.deletedAt ? (
+                        <span className="text-[9px] font-bold text-red-500 mt-1">
+                             Silindi: {new Date(task.deletedAt).toLocaleDateString('tr-TR')}
+                        </span>
+                    ) : renderSeenStatus()}
                   </div>
               </div>
           )}
@@ -293,13 +307,12 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                             <span className="text-[10px] font-medium text-slate-500">
                                {new Date(task.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
                             </span>
-                            {renderSeenStatus()}
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Süreç Takibi (Timeline benzeri) */}
+            {/* Süreç Takibi */}
             {(task.startedAt || task.status === TaskStatus.IN_PROGRESS || task.status === TaskStatus.COMPLETED) && !isCancelled && (
               <div className="mb-4 bg-slate-700/30 rounded-xl p-3 border border-slate-700 flex items-center justify-between text-center relative overflow-hidden">
                 <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-700 -z-0"></div>
@@ -335,8 +348,8 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
               </div>
             )}
 
-            {/* Aksiyon Butonları */}
-            {user.role === 'USTA' && !isCancelled && task.status !== TaskStatus.COMPLETED && (
+            {/* Aksiyon Butonları (Arşivde veya iptal edilmişse gösterme) */}
+            {user.role === 'USTA' && !isCancelled && !isArchived && task.status !== TaskStatus.COMPLETED && (
               <div className="pt-2 border-t border-slate-700">
                 {!showCommentInput ? (
                   <button 
