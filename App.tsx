@@ -1203,7 +1203,7 @@ const App: React.FC = () => {
            {/* GÖREV LİSTESİ RENDER MANTIĞI */}
            {(() => {
                // 1. Sekmeye Göre Ana Filtreleme (Aktif / Geçmiş / Arşiv)
-               let displayedTasks = [];
+               let displayedTasks: Task[] = [];
                
                if (activeTaskTab === 'active') {
                    // Tamamlanmamış ve İptal edilmemişler
