@@ -700,19 +700,23 @@ const App: React.FC = () => {
     await saveAppData({ tasks: updatedTasks, requests, leaves, amirs: amirList, ustas: ustaList, deletedTasks: archivedTasks }, connectionId);
     setLoading(false);
     
-    // WHATSAPP ENTEGRASYONU
+    // SMS ENTEGRASYONU
     const assignedUsta = ustaList.find(u => u.name === newTaskMaster);
     if (assignedUsta && assignedUsta.phoneNumber) {
-        // Whatsapp Link Oluşturma
-        const message = `*🔧 YENİ HİDROLİK GÖREVİ*\n\n*Makine:* ${newTaskMachine}\n*Öncelik:* ${newTaskPriority}\n*İş Emri:* ${newTaskDescription}\n\nLütfen HidroGörev uygulamasından onaylayınız.`;
-        const waUrl = `https://wa.me/${assignedUsta.phoneNumber}?text=${encodeURIComponent(message)}`;
+        // SMS Metni
+        const message = `🔧 YENİ HİDROLİK GÖREVİ\n\nMakine: ${newTaskMachine}\nÖncelik: ${newTaskPriority}\nİş Emri: ${newTaskDescription}\n\nLütfen HidroGörev uygulamasından onaylayınız.`;
         
-        // Kullanıcıya sor veya direkt aç (Mobil tarayıcılarda pop-up engelleyici olabilir, bu yüzden confirm kullanıyoruz)
-        if(confirm(`${newTaskMaster} adlı ustaya WhatsApp bildirimi gönderilsin mi?`)) {
-            window.open(waUrl, '_blank');
+        // iOS ve Android uyumluluğu için
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const separator = isIOS ? '&' : '?';
+        
+        const smsUrl = `sms:${assignedUsta.phoneNumber}${separator}body=${encodeURIComponent(message)}`;
+        
+        if(confirm(`${newTaskMaster} adlı ustaya SMS mesajı oluşturulsun mu?`)) {
+            window.location.href = smsUrl;
         }
     } else {
-        alert("Görev yayınlandı. (Ustanın telefon numarası kayıtlı olmadığı için WhatsApp açılmadı)");
+        alert("Görev yayınlandı. (Ustanın telefon numarası kayıtlı olmadığı için SMS ekranı açılamadı)");
     }
     
     setNewTaskMachine('');
