@@ -1,5 +1,5 @@
 
-import { Task, Member, UstaRequest } from '../types';
+import { Task, Member, UstaRequest, LeaveRequest } from '../types';
 
 // İki farklı sağlayıcı kullanıyoruz.
 const PROVIDER_JSONBLOB = {
@@ -21,6 +21,7 @@ const DEMO_ID = '908d1788734268713503';
 export interface AppData {
   tasks: Task[];
   requests: UstaRequest[];
+  leaves: LeaveRequest[];
   amirs: Member[];
   ustas: Member[];
   updatedAt: number;
@@ -85,6 +86,7 @@ export const createNewBin = async (defaultAmirs: Member[], defaultUstas: Member[
   const initialData: AppData = {
     tasks: [],
     requests: [],
+    leaves: [],
     amirs: defaultAmirs,
     ustas: defaultUstas,
     updatedAt: Date.now()
@@ -137,7 +139,7 @@ export const fetchAppData = async (binId?: string): Promise<AppData> => {
   const id = binId || getStoredBinId();
   
   // Varsayılan boş yapı
-  const emptyData: AppData = { tasks: [], requests: [], amirs: [], ustas: [], updatedAt: 0 };
+  const emptyData: AppData = { tasks: [], requests: [], leaves: [], amirs: [], ustas: [], updatedAt: 0 };
 
   if (!id) {
     const localDataStr = localStorage.getItem(LOCAL_KEY_DATA);
@@ -150,6 +152,7 @@ export const fetchAppData = async (binId?: string): Promise<AppData> => {
            ...emptyData, 
            ...parsed,
            requests: Array.isArray(parsed.requests) ? parsed.requests : [],
+           leaves: Array.isArray(parsed.leaves) ? parsed.leaves : [],
            amirs: normalizeMembers(parsed.amirs),
            ustas: normalizeMembers(parsed.ustas)
        };
@@ -170,6 +173,7 @@ export const fetchAppData = async (binId?: string): Promise<AppData> => {
       
       let tasks: Task[] = [];
       let requests: UstaRequest[] = [];
+      let leaves: LeaveRequest[] = [];
       let amirs: Member[] = [];
       let ustas: Member[] = [];
 
@@ -178,11 +182,12 @@ export const fetchAppData = async (binId?: string): Promise<AppData> => {
       } else {
         tasks = Array.isArray(data.tasks) ? data.tasks : [];
         requests = Array.isArray(data.requests) ? data.requests : [];
+        leaves = Array.isArray(data.leaves) ? data.leaves : [];
         amirs = normalizeMembers(data.amirs);
         ustas = normalizeMembers(data.ustas);
       }
       
-      const normalizedData: AppData = { tasks, requests, amirs, ustas, updatedAt: data.updatedAt || Date.now() };
+      const normalizedData: AppData = { tasks, requests, leaves, amirs, ustas, updatedAt: data.updatedAt || Date.now() };
       
       localStorage.setItem(LOCAL_KEY_DATA, JSON.stringify(normalizedData));
       return normalizedData;
@@ -200,6 +205,7 @@ export const fetchAppData = async (binId?: string): Promise<AppData> => {
           ...emptyData, 
           ...parsed,
           requests: Array.isArray(parsed.requests) ? parsed.requests : [],
+          leaves: Array.isArray(parsed.leaves) ? parsed.leaves : [],
           amirs: normalizeMembers(parsed.amirs),
           ustas: normalizeMembers(parsed.ustas)
       };

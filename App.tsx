@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Task, User, TaskStatus, TaskPriority, Member, UstaRequest, RequestStatus } from './types';
+import { Task, User, TaskStatus, TaskPriority, Member, UstaRequest, RequestStatus, LeaveRequest } from './types';
 import { fetchAppData, saveAppData, createNewBin, getStoredBinId, setStoredBinId, extractBinId, checkConnection } from './services/dbService';
 import Layout from './components/Layout';
 import TaskCard from './components/TaskCard';
+import CalendarView from './components/CalendarView';
 
 // Varsayılan listeler (İlk kurulum veya yerel mod için)
 const DEFAULT_AMIRS: Member[] = [
@@ -31,11 +32,12 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [requests, setRequests] = useState<UstaRequest[]>([]);
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [amirList, setAmirList] = useState<Member[]>(DEFAULT_AMIRS);
   const [ustaList, setUstaList] = useState<Member[]>(DEFAULT_USTAS);
   
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tasks' | 'add' | 'profile' | 'requests'>('tasks');
+  const [activeTab, setActiveTab] = useState<'tasks' | 'add' | 'profile' | 'requests' | 'calendar'>('tasks');
   const [connectionId, setConnectionId] = useState(getStoredBinId());
   
   // Personel Yönetimi State'leri
@@ -145,6 +147,7 @@ const App: React.FC = () => {
     
     setTasks(data.tasks);
     setRequests(data.requests);
+    setLeaves(data.leaves);
     
     // İlk yüklemede mevcut ID'leri kaydet ki bildirim gitmesin
     if (isFirstLoadRef.current && data.tasks.length > 0) {
@@ -188,6 +191,7 @@ const App: React.FC = () => {
              const data = await fetchAppData(autoId);
              setTasks(data.tasks);
              setRequests(data.requests);
+             setLeaves(data.leaves);
              // İlk yükleme olduğu için ID'leri sete at
              data.tasks.forEach(t => lastTaskIdsRef.current.add(t.id));
              isFirstLoadRef.current = false;
@@ -206,6 +210,7 @@ const App: React.FC = () => {
             // State güncelle
             setTasks(data.tasks);
             setRequests(data.requests);
+            setLeaves(data.leaves);
             if (data.amirs.length > 0) setAmirList(data.amirs);
             if (data.ustas.length > 0) setUstaList(data.ustas);
 
@@ -382,7 +387,7 @@ const App: React.FC = () => {
         setUstaList(newUstas);
     }
 
-    await saveAppData({ tasks, requests, amirs: newAmirs, ustas: newUstas }, connectionId);
+    await saveAppData({ tasks, requests, leaves, amirs: newAmirs, ustas: newUstas }, connectionId);
     setNewMemberName('');
     setNewMemberPassword('');
     setNewMemberPhone('');
@@ -405,7 +410,7 @@ const App: React.FC = () => {
           setUstaList(newUstas);
       }
       
-      await saveAppData({ tasks, requests, amirs: newAmirs, ustas: newUstas }, connectionId);
+      await saveAppData({ tasks, requests, leaves, amirs: newAmirs, ustas: newUstas }, connectionId);
       setLoading(false);
   };
 
@@ -432,7 +437,7 @@ const App: React.FC = () => {
         setUstaList(newUstas);
     }
 
-    await saveAppData({ tasks, requests, amirs: newAmirs, ustas: newUstas }, connectionId);
+    await saveAppData({ tasks, requests, leaves, amirs: newAmirs, ustas: newUstas }, connectionId);
     setLoading(false);
     setPasswordChangeModal(null);
     setNewPasswordInput('');
@@ -494,7 +499,7 @@ const App: React.FC = () => {
     lastTaskIdsRef.current.add(newTask.id);
     
     setLoading(true);
-    await saveAppData({ tasks: updatedTasks, requests, amirs: amirList, ustas: ustaList }, connectionId);
+    await saveAppData({ tasks: updatedTasks, requests, leaves, amirs: amirList, ustas: ustaList }, connectionId);
     setLoading(false);
     
     // WHATSAPP ENTEGRASYONU
@@ -546,7 +551,7 @@ const App: React.FC = () => {
       setTasks(updatedTasks);
       
       // Arka planda kaydet
-      await saveAppData({ tasks: updatedTasks, requests, amirs: amirList, ustas: ustaList }, connectionId);
+      await saveAppData({ tasks: updatedTasks, requests, leaves, amirs: amirList, ustas: ustaList }, connectionId);
   };
 
   const updateTaskStatus = async (taskId: string, newStatus: TaskStatus, comment?: string, completedImage?: string) => {
@@ -568,7 +573,7 @@ const App: React.FC = () => {
     });
     
     setTasks(updatedTasks);
-    await saveAppData({ tasks: updatedTasks, requests, amirs: amirList, ustas: ustaList }, connectionId);
+    await saveAppData({ tasks: updatedTasks, requests, leaves, amirs: amirList, ustas: ustaList }, connectionId);
     setLoading(false);
   };
 
@@ -578,7 +583,7 @@ const App: React.FC = () => {
     setLoading(true);
     const updatedTasks = tasks.filter(t => t.id !== taskId);
     setTasks(updatedTasks);
-    await saveAppData({ tasks: updatedTasks, requests, amirs: amirList, ustas: ustaList }, connectionId);
+    await saveAppData({ tasks: updatedTasks, requests, leaves, amirs: amirList, ustas: ustaList }, connectionId);
     setLoading(false);
   };
 
@@ -599,11 +604,56 @@ const App: React.FC = () => {
     setRequests(updatedRequests);
     
     setLoading(true);
-    await saveAppData({ tasks, requests: updatedRequests, amirs: amirList, ustas: ustaList }, connectionId);
+    await saveAppData({ tasks, requests: updatedRequests, leaves, amirs: amirList, ustas: ustaList }, connectionId);
     setLoading(false);
     
     setNewRequestContent('');
     alert("Talebiniz yöneticiye iletildi.");
+  };
+
+  // İZİN YÖNETİMİ
+  const handleAddLeave = async (start: string, end: string, reason: string) => {
+      if(!currentUser) return;
+
+      const startDate = new Date(start);
+      const endDate = new Date(end);
+      const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+      const daysCount = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 dahil olması için
+
+      const newLeave: LeaveRequest = {
+          id: Date.now().toString(),
+          ustaName: currentUser.name,
+          startDate: start,
+          endDate: end,
+          daysCount: daysCount,
+          reason: reason,
+          status: RequestStatus.PENDING, // Varsayılan olarak amir onayı bekler
+          createdAt: Date.now()
+      };
+
+      const updatedLeaves = [...leaves, newLeave];
+      setLeaves(updatedLeaves);
+      
+      setLoading(true);
+      await saveAppData({ tasks, requests, leaves: updatedLeaves, amirs: amirList, ustas: ustaList }, connectionId);
+      setLoading(false);
+      alert("İzin talebi oluşturuldu.");
+  };
+
+  const handleDeleteLeave = async (leaveId: string) => {
+      if(!confirm("İzin talebini silmek istediğinize emin misiniz?")) return;
+      const updatedLeaves = leaves.filter(l => l.id !== leaveId);
+      setLeaves(updatedLeaves);
+      await saveAppData({ tasks, requests, leaves: updatedLeaves, amirs: amirList, ustas: ustaList }, connectionId);
+  };
+
+  const handleLeaveStatus = async (leaveId: string, status: RequestStatus) => {
+      const updatedLeaves = leaves.map(l => {
+          if (l.id === leaveId) return { ...l, status };
+          return l;
+      });
+      setLeaves(updatedLeaves);
+      await saveAppData({ tasks, requests, leaves: updatedLeaves, amirs: amirList, ustas: ustaList }, connectionId);
   };
 
   // TALEP DURUM GÜNCELLEME (AMİR)
@@ -616,7 +666,7 @@ const App: React.FC = () => {
         return r;
     });
     setRequests(updatedRequests);
-    await saveAppData({ tasks, requests: updatedRequests, amirs: amirList, ustas: ustaList }, connectionId);
+    await saveAppData({ tasks, requests: updatedRequests, leaves, amirs: amirList, ustas: ustaList }, connectionId);
     setLoading(false);
   };
 
@@ -626,7 +676,7 @@ const App: React.FC = () => {
       setLoading(true);
       const updatedRequests = requests.filter(r => r.id !== reqId);
       setRequests(updatedRequests);
-      await saveAppData({ tasks, requests: updatedRequests, amirs: amirList, ustas: ustaList }, connectionId);
+      await saveAppData({ tasks, requests: updatedRequests, leaves, amirs: amirList, ustas: ustaList }, connectionId);
       setLoading(false);
   };
 
@@ -792,6 +842,16 @@ const App: React.FC = () => {
             )}
           </div>
         </div>
+      )}
+
+      {activeTab === 'calendar' && (
+          <CalendarView 
+             leaves={leaves} 
+             user={currentUser} 
+             onAddLeave={handleAddLeave}
+             onDeleteLeave={handleDeleteLeave}
+             onUpdateStatus={handleLeaveStatus}
+          />
       )}
 
       {activeTab === 'add' && currentUser.role === 'AMIR' && (

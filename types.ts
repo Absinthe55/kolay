@@ -44,6 +44,17 @@ export interface UstaRequest {
   responseNote?: string; // Yöneticinin notu
 }
 
+export interface LeaveRequest {
+  id: string;
+  ustaName: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
+  daysCount: number;
+  reason: string;
+  status: RequestStatus;
+  createdAt: number;
+}
+
 export interface User {
   id: string;
   name: string;

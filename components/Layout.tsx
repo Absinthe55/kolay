@@ -6,8 +6,8 @@ interface LayoutProps {
   children: React.ReactNode;
   user: User | null;
   onLogout: () => void;
-  activeTab: 'tasks' | 'add' | 'profile' | 'requests';
-  setActiveTab: (tab: 'tasks' | 'add' | 'profile' | 'requests') => void;
+  activeTab: 'tasks' | 'add' | 'profile' | 'requests' | 'calendar';
+  setActiveTab: (tab: 'tasks' | 'add' | 'profile' | 'requests' | 'calendar') => void;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, activeTab, setActiveTab }) => {
@@ -45,18 +45,18 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, activeTab, se
       <nav className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 flex justify-around items-center p-3 pb-6 shadow-[0_-10px_30px_rgba(0,0,0,0.3)] z-50">
         <button 
           onClick={() => setActiveTab('tasks')}
-          className={`flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 w-16 ${activeTab === 'tasks' ? 'text-blue-500 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}
+          className={`flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 w-14 ${activeTab === 'tasks' ? 'text-blue-500 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}
         >
           <i className={`fas fa-list-check text-xl ${activeTab === 'tasks' ? 'drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]' : ''}`}></i>
           <span className={`text-[9px] font-bold ${activeTab === 'tasks' ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden'}`}>Görevler</span>
         </button>
 
         <button 
-          onClick={() => setActiveTab('requests')}
-          className={`flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 w-16 ${activeTab === 'requests' ? 'text-orange-500 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}
+          onClick={() => setActiveTab('calendar')}
+          className={`flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 w-14 ${activeTab === 'calendar' ? 'text-purple-500 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}
         >
-           <i className={`fas fa-envelope-open-text text-xl ${activeTab === 'requests' ? 'drop-shadow-[0_0_10px_rgba(249,115,22,0.5)]' : ''}`}></i>
-           <span className={`text-[9px] font-bold ${activeTab === 'requests' ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden'}`}>Talepler</span>
+           <i className={`fas fa-calendar-alt text-xl ${activeTab === 'calendar' ? 'drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]' : ''}`}></i>
+           <span className={`text-[9px] font-bold ${activeTab === 'calendar' ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden'}`}>Takvim</span>
         </button>
 
         {user.role === 'AMIR' && (
@@ -70,8 +70,16 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, activeTab, se
         )}
 
         <button 
+          onClick={() => setActiveTab('requests')}
+          className={`flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 w-14 ${activeTab === 'requests' ? 'text-orange-500 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}
+        >
+           <i className={`fas fa-envelope-open-text text-xl ${activeTab === 'requests' ? 'drop-shadow-[0_0_10px_rgba(249,115,22,0.5)]' : ''}`}></i>
+           <span className={`text-[9px] font-bold ${activeTab === 'requests' ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden'}`}>Talepler</span>
+        </button>
+
+        <button 
           onClick={() => setActiveTab('profile')}
-          className={`flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 w-16 ${activeTab === 'profile' ? 'text-blue-500 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}
+          className={`flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 w-14 ${activeTab === 'profile' ? 'text-blue-500 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}
         >
           <i className={`fas fa-user-cog text-xl ${activeTab === 'profile' ? 'drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]' : ''}`}></i>
            <span className={`text-[9px] font-bold ${activeTab === 'profile' ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden'}`}>Profil</span>
