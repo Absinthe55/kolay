@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Task, User, TaskStatus, TaskPriority, Member, UstaRequest, RequestStatus, LeaveRequest } from './types';
-import { fetchAppData, saveAppData, createNewBin, getStoredBinId, setStoredBinId, extractBinId, checkConnection } from './services/dbService';
+import { fetchAppData, saveAppData, createNewBin, getStoredBinId, setStoredBinId, extractBinId, checkConnection, archiveDeletedTask } from './services/dbService';
 import Layout from './components/Layout';
 import TaskCard from './components/TaskCard';
 import CalendarView from './components/CalendarView';
@@ -638,6 +638,16 @@ const App: React.FC = () => {
     if (!confirm("BU GÖREV KALICI OLARAK SİLİNECEK.\n\nEmin misiniz?")) return;
 
     setLoading(true);
+
+    // 1. Silinecek görevi bul
+    const taskToDelete = tasks.find(t => t.id === taskId);
+
+    // 2. Eğer görev varsa, önce arşive gönder
+    if (taskToDelete) {
+        await archiveDeletedTask(taskToDelete);
+    }
+
+    // 3. Görevi mevcut listeden sil
     const updatedTasks = tasks.filter(t => t.id !== taskId);
     setTasks(updatedTasks);
     await saveAppData({ tasks: updatedTasks, requests, leaves, amirs: amirList, ustas: ustaList }, connectionId);

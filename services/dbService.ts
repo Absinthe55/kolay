@@ -18,6 +18,9 @@ const LOCAL_KEY_DATA = 'hidro_data';
 // Demo ID
 const DEMO_ID = '908d1788734268713503'; 
 
+// Silinen Görevlerin Arşivleneceği Sabit ID
+const ARCHIVE_BIN_ID = 'b377ac3abf9b89fad6b0';
+
 export interface AppData {
   tasks: Task[];
   requests: UstaRequest[];
@@ -132,6 +135,43 @@ export const createNewBin = async (defaultAmirs: Member[], defaultUstas: Member[
   }
 
   return null;
+};
+
+// Silinen Görevleri Arşivler (İkinci veritabanı bağlantısı)
+export const archiveDeletedTask = async (task: Task) => {
+  const url = getProviderUrl(ARCHIVE_BIN_ID);
+  
+  try {
+    // 1. Mevcut arşiv verisini çek
+    const response = await fetch(url);
+    let deletedTasks: Task[] = [];
+    
+    if (response.ok) {
+        const data = await response.json();
+        // Veri yapısını kontrol et (Düz array mi obje mi)
+        if (Array.isArray(data)) {
+            deletedTasks = data;
+        } else if (data && Array.isArray(data.deletedTasks)) {
+            deletedTasks = data.deletedTasks;
+        }
+    }
+
+    // 2. Yeni silinen görevi listeye ekle (En başa)
+    const taskToArchive = { ...task, deletedAt: Date.now() };
+    deletedTasks.unshift(taskToArchive);
+
+    // 3. Arşivi güncelle
+    await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deletedTasks, updatedAt: Date.now() })
+    });
+    console.log("Görev arşivlendi:", task.machineName);
+    
+  } catch (e) {
+      console.error("Arşivleme hatası:", e);
+      // Arşivleme hatası ana akışı bozmamalı
+  }
 };
 
 // Tüm verileri (Görevler + Personel Listesi) çeker

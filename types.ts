@@ -33,6 +33,7 @@ export interface Task {
   comments?: string;
   image?: string; // Görev oluşturulurken eklenen resim
   completedImage?: string; // Görev bitirilirken eklenen resim
+  deletedAt?: number; // Görev silindiğinde arşiv için eklenen zaman damgası
 }
 
 export interface UstaRequest {
