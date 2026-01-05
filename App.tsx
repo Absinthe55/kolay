@@ -101,6 +101,40 @@ const App: React.FC = () => {
       return (Date.now() - lastActive) < 2 * 60 * 1000; // 2 dakika
   };
 
+  // Son Görülme Zamanı Formatlama
+  const formatLastActive = (timestamp?: number) => {
+      if (!timestamp) return '';
+      const now = Date.now();
+      const diff = now - timestamp;
+      const date = new Date(timestamp);
+
+      // 2 dakikadan az ise
+      if (diff < 2 * 60 * 1000) return 'Çevrimiçi';
+
+      // Bugün mü?
+      const isToday = date.getDate() === new Date().getDate() &&
+                      date.getMonth() === new Date().getMonth() &&
+                      date.getFullYear() === new Date().getFullYear();
+
+      if (isToday) {
+          return `Bugün ${date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+      }
+
+      // Dün mü?
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const isYesterday = date.getDate() === yesterday.getDate() &&
+                          date.getMonth() === yesterday.getMonth() &&
+                          date.getFullYear() === yesterday.getFullYear();
+      
+      if (isYesterday) {
+          return `Dün ${date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+      }
+
+      // Daha eski
+      return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  };
+
   // Bildirim İzni İsteme Fonksiyonu
   const requestNotificationPermission = async () => {
     if (!('Notification' in window)) {
@@ -787,17 +821,26 @@ const App: React.FC = () => {
                 {amirList.map(member => (
                   <button key={member.name} onClick={() => handleLoginClick(member, 'AMIR')} className="group relative bg-slate-800/50 hover:bg-blue-600 border border-white/5 p-4 rounded-2xl text-left font-bold transition-all duration-300 flex justify-between items-center overflow-hidden">
                     <div className="absolute inset-0 bg-blue-400/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
-                    <span className="text-slate-200 group-hover:text-white relative z-10 flex items-center gap-3">
-                        <div className="relative">
+                    <div className="text-slate-200 group-hover:text-white relative z-10 flex items-center gap-3">
+                        <div className="relative flex-shrink-0">
                             <i className="fas fa-user-tie text-blue-400 group-hover:text-white/80"></i>
                             {isUserOnline(member.lastActive) && (
                                 <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-green-500 border-2 border-slate-800 rounded-full"></span>
                             )}
                         </div>
-                        {member.name}
-                        {member.password && <i className="fas fa-lock text-[10px] text-slate-500 group-hover:text-white/50"></i>}
-                    </span>
-                    <i className="fas fa-arrow-right text-slate-600 group-hover:text-white relative z-10 opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0"></i>
+                        <div className="flex flex-col items-start min-w-0">
+                            <span className="flex items-center gap-2 truncate">
+                                {member.name}
+                                {member.password && <i className="fas fa-lock text-[10px] text-slate-500 group-hover:text-white/50"></i>}
+                            </span>
+                            {member.lastActive && (
+                                <span className="text-[10px] font-normal text-slate-400 group-hover:text-blue-200 truncate">
+                                     {formatLastActive(member.lastActive)}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    <i className="fas fa-arrow-right text-slate-600 group-hover:text-white relative z-10 opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0 ml-auto"></i>
                   </button>
                 ))}
               </div>
@@ -815,17 +858,26 @@ const App: React.FC = () => {
                 {ustaList.map(member => (
                   <button key={member.name} onClick={() => handleLoginClick(member, 'USTA')} className="group relative bg-slate-800/50 hover:bg-emerald-600 border border-white/5 p-4 rounded-2xl text-left font-bold transition-all duration-300 flex justify-between items-center overflow-hidden">
                     <div className="absolute inset-0 bg-emerald-400/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
-                    <span className="text-slate-200 group-hover:text-white relative z-10 flex items-center gap-3">
-                        <div className="relative">
+                    <div className="text-slate-200 group-hover:text-white relative z-10 flex items-center gap-3">
+                        <div className="relative flex-shrink-0">
                             <i className="fas fa-wrench text-emerald-400 group-hover:text-white/80"></i>
                             {isUserOnline(member.lastActive) && (
                                 <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-green-500 border-2 border-slate-800 rounded-full"></span>
                             )}
                         </div>
-                        {member.name}
-                        {member.password && <i className="fas fa-lock text-[10px] text-slate-500 group-hover:text-white/50"></i>}
-                    </span>
-                    <i className="fas fa-arrow-right text-slate-600 group-hover:text-white relative z-10 opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0"></i>
+                        <div className="flex flex-col items-start min-w-0">
+                            <span className="flex items-center gap-2 truncate">
+                                {member.name}
+                                {member.password && <i className="fas fa-lock text-[10px] text-slate-500 group-hover:text-white/50"></i>}
+                            </span>
+                            {member.lastActive && (
+                                <span className="text-[10px] font-normal text-slate-400 group-hover:text-emerald-200 truncate">
+                                     {formatLastActive(member.lastActive)}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    <i className="fas fa-arrow-right text-slate-600 group-hover:text-white relative z-10 opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0 ml-auto"></i>
                   </button>
                 ))}
               </div>
