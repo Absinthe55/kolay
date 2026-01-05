@@ -1,13 +1,13 @@
 
 import React from 'react';
-import { User } from '../types';
+import { User, AppTab } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
   user: User | null;
   onLogout: () => void;
-  activeTab: 'tasks' | 'add' | 'profile' | 'requests' | 'calendar';
-  setActiveTab: (tab: 'tasks' | 'add' | 'profile' | 'requests' | 'calendar') => void;
+  activeTab: AppTab;
+  setActiveTab: (tab: AppTab) => void;
 }
 
 // Resim URL'si (App.tsx ile aynı veya props olarak geçilebilir, şimdilik sabit)
@@ -21,8 +21,9 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, activeTab, se
       <header className="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 p-4 sticky top-0 z-50 transition-all">
         <div className="container mx-auto max-w-lg flex justify-between items-center">
             <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center shadow-lg overflow-hidden border border-white/10">
-                <img src={GROUP_IMAGE_URL} alt="Logo" className="w-full h-full object-cover" />
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20 border border-white/10 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <i className="fas fa-cogs text-white text-lg drop-shadow-md"></i>
             </div>
             <div className="leading-tight">
                 <h1 className="font-black text-slate-100 tracking-tight text-lg">HİDROLİK</h1>

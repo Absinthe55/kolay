@@ -78,3 +78,5 @@ export interface AppState {
   requests: UstaRequest[];
   currentUser: User | null;
 }
+
+export type AppTab = 'tasks' | 'add' | 'profile' | 'requests' | 'calendar';
