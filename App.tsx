@@ -76,6 +76,10 @@ const App: React.FC = () => {
   // Bildirim Takibi için Ref (Son bilinen görev ID'leri)
   const lastTaskIdsRef = useRef<Set<string>>(new Set());
   const isFirstLoadRef = useRef(true);
+  
+  // Performans ve Kilit Refleri
+  const isFetchingRef = useRef(false); // Üst üste istek binmesini engeller
+  const lastKnownDataUpdateRef = useRef<number>(0); // Gereksiz render'ı engeller
 
   // Pull to Refresh State
   const [pullStartY, setPullStartY] = useState(0);
@@ -237,12 +241,14 @@ const App: React.FC = () => {
 
   // Veri Yükleme
   const loadData = useCallback(async (forceId?: string) => {
+    // Manuel yenilemede kilit kontrolü yapmıyoruz, kullanıcı bilerek basmıştır.
     setLoading(true);
     const targetId = forceId || connectionId;
     const data = await fetchAppData(targetId);
     
     // Senkronizasyon zamanını sıfırla
     setLastSyncTime(Date.now());
+    lastKnownDataUpdateRef.current = data.updatedAt;
 
     setTasks(data.tasks);
     setRequests(data.requests);
@@ -407,6 +413,7 @@ const App: React.FC = () => {
              // İlk yükleme olduğu için ID'leri sete at
              data.tasks.forEach(t => lastTaskIdsRef.current.add(t.id));
              isFirstLoadRef.current = false;
+             lastKnownDataUpdateRef.current = data.updatedAt;
 
              if (data.amirs) setAmirList(data.amirs);
              if (data.ustas) setUstaList(data.ustas);
@@ -415,50 +422,59 @@ const App: React.FC = () => {
     };
     initAutoConnect();
 
-    // 4. Periyodik güncelleme ve Bildirim Kontrolü (2 Saniyede Bir - DAHA SIK)
-    const interval = setInterval(() => {
-      if (connectionId) {
-        fetchAppData(connectionId).then(data => {
-            // Senkronizasyon zamanını sıfırla
+    // 4. Periyodik güncelleme ve Bildirim Kontrolü (HIZLI SENKRONİZASYON)
+    const interval = setInterval(async () => {
+      // Eğer bağlantı yoksa veya şu an zaten bir istek yapılıyorsa (isFetchingRef), yeni istek atma (Kasma Önleyici)
+      if (connectionId && !isFetchingRef.current) {
+        
+        isFetchingRef.current = true; // Kilidi kapat
+
+        try {
+            const data = await fetchAppData(connectionId);
+            
+            // Senkronizasyon zamanını her türlü güncelle (kullanıcı sunucuya erişildiğini bilsin)
             setLastSyncTime(Date.now());
 
-            // State güncelle
-            setTasks(data.tasks);
-            setRequests(data.requests);
-            setLeaves(data.leaves);
-            setArchivedTasks(data.deletedTasks);
+            // ÖNEMLİ OPTİMİZASYON:
+            // Sadece veri gerçekten değiştiyse React state'ini güncelle.
+            // Bu sayede telefon her 750ms'de bir boşuna ekranı yeniden çizmez.
+            if (data.updatedAt > lastKnownDataUpdateRef.current) {
+                lastKnownDataUpdateRef.current = data.updatedAt;
 
-            if (data.amirs) setAmirList(data.amirs);
-            if (data.ustas) setUstaList(data.ustas);
+                setTasks(data.tasks);
+                setRequests(data.requests);
+                setLeaves(data.leaves);
+                setArchivedTasks(data.deletedTasks);
 
-            // BİLDİRİM MANTIĞI
-            if (currentUser) {
-                data.tasks.forEach(task => {
-                    // Eğer bu görev daha önce görülmemişse (Yeni ise)
-                    if (!lastTaskIdsRef.current.has(task.id)) {
-                        
-                        // 1. Durum: Ben USTAYIM ve görev BANA atanmış
-                        if (currentUser.role === 'USTA' && task.masterName === currentUser.name) {
-                            sendNotification(
-                                "🛠️ YENİ GÖREV!", 
-                                `${task.machineName} makinesinde yeni iş emriniz var.`
-                            );
+                if (data.amirs) setAmirList(data.amirs);
+                if (data.ustas) setUstaList(data.ustas);
+
+                // BİLDİRİM MANTIĞI
+                if (currentUser) {
+                    data.tasks.forEach(task => {
+                        // Eğer bu görev daha önce görülmemişse (Yeni ise)
+                        if (!lastTaskIdsRef.current.has(task.id)) {
+                            // 1. Durum: Ben USTAYIM ve görev BANA atanmış
+                            if (currentUser.role === 'USTA' && task.masterName === currentUser.name) {
+                                sendNotification(
+                                    "🛠️ YENİ GÖREV!", 
+                                    `${task.machineName} makinesinde yeni iş emriniz var.`
+                                );
+                            }
+                            lastTaskIdsRef.current.add(task.id);
                         }
-                        // 2. Durum: Ben AMİRİM, sisteme herhangi bir görev eklendi
-                        else if (currentUser.role === 'AMIR') {
-                             // Amir opsiyonel bildirim
-                        }
-
-                        // ID'yi listeye ekle
-                        lastTaskIdsRef.current.add(task.id);
-                    }
-                });
-            } else {
-                 data.tasks.forEach(t => lastTaskIdsRef.current.add(t.id));
+                    });
+                } else {
+                     data.tasks.forEach(t => lastTaskIdsRef.current.add(t.id));
+                }
             }
-        });
+        } catch (e) {
+            console.error("Auto sync error:", e);
+        } finally {
+            isFetchingRef.current = false; // Kilidi aç
+        }
       }
-    }, 2000); // 2 saniye
+    }, 750); // 750ms (Ping-like speed)
 
     // Sayfa görünür olduğunda (arkaplansan dönünce) hemen veri çek
     const handleVisibilityChange = () => {
@@ -1200,7 +1216,7 @@ const App: React.FC = () => {
                 </div>
             )}
           </div>
-          <p className="text-center text-[10px] text-slate-600 mt-6 font-mono">v1.0.4 &bull; Güvenli Bağlantı</p>
+          <p className="text-center text-[10px] text-slate-600 mt-6 font-mono">v1.0.5 &bull; Hızlı Senkronizasyon</p>
         </div>
 
         {/* Login Password Modal */}
