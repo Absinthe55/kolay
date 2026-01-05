@@ -95,7 +95,6 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
 
   const handleDeleteTask = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isArchived) return; // Arşivlenmiş görev buradan silinmez (veya farklı logic)
     if (onDelete) onDelete(task.id);
   };
 
@@ -206,17 +205,24 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
 
             {/* Sağ Üst Aksiyonlar */}
             <div className="flex flex-col items-end gap-2">
-                 {/* Amir Aksiyonları - Arşivdeyse gösterme */}
-                 {user.role === 'AMIR' && !isArchived && (
+                 {/* Amir Aksiyonları */}
+                 {user.role === 'AMIR' && (
                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        {!isCancelled && task.status !== TaskStatus.COMPLETED && (
+                        {/* Normal İptal Butonu - Sadece arşivde DEĞİLSE ve tamamlanmadıysa */}
+                        {!isArchived && !isCancelled && task.status !== TaskStatus.COMPLETED && (
                             <button onClick={handleCancelTask} className="w-8 h-8 rounded-full bg-red-900/30 text-red-400 flex items-center justify-center hover:bg-red-600 hover:text-white transition-colors" title="İptal Et">
                                 <i className="fas fa-ban text-xs"></i>
                             </button>
                         )}
+                        
+                        {/* Silme Butonu - Hem normalde hem arşivde kullanılabilir ama mantığı farklı */}
                         {onDelete && (
-                            <button onClick={handleDeleteTask} className="w-8 h-8 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center hover:bg-red-600 hover:text-white transition-colors" title="Sil">
-                                <i className="fas fa-trash-alt text-xs"></i>
+                            <button 
+                              onClick={handleDeleteTask} 
+                              className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isArchived ? 'bg-red-800 text-red-200 hover:bg-red-600 hover:text-white shadow-lg shadow-red-900/50' : 'bg-slate-700 text-slate-400 hover:bg-red-600 hover:text-white'}`} 
+                              title={isArchived ? "Kalıcı Olarak Sil" : "Sil"}
+                            >
+                                <i className={`fas ${isArchived ? 'fa-dumpster-fire' : 'fa-trash-alt'} text-xs`}></i>
                             </button>
                         )}
                      </div>

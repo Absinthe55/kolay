@@ -190,6 +190,30 @@ export const fetchArchivedTasks = async (): Promise<Task[]> => {
     return [];
 };
 
+// Arşivden Kalıcı Olarak Silme
+export const permanentlyDeleteTask = async (taskId: string): Promise<boolean> => {
+    const url = getProviderUrl(ARCHIVE_BIN_ID);
+    try {
+        // 1. Mevcut arşivi çek
+        const currentTasks = await fetchArchivedTasks();
+        
+        // 2. İlgili görevi filtrele
+        const updatedTasks = currentTasks.filter(t => t.id !== taskId);
+
+        // 3. Güncel listeyi kaydet
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deletedTasks: updatedTasks, updatedAt: Date.now() })
+        });
+        
+        return response.ok;
+    } catch (e) {
+        console.error("Kalıcı silme hatası:", e);
+        return false;
+    }
+};
+
 // Tüm verileri (Görevler + Personel Listesi) çeker
 export const fetchAppData = async (binId?: string): Promise<AppData> => {
   const id = binId || getStoredBinId();

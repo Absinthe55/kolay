@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Task, User, TaskStatus, TaskPriority, Member, UstaRequest, RequestStatus, LeaveRequest } from './types';
-import { fetchAppData, saveAppData, createNewBin, getStoredBinId, setStoredBinId, extractBinId, checkConnection, archiveDeletedTask, fetchArchivedTasks } from './services/dbService';
+import { fetchAppData, saveAppData, createNewBin, getStoredBinId, setStoredBinId, extractBinId, checkConnection, archiveDeletedTask, fetchArchivedTasks, permanentlyDeleteTask } from './services/dbService';
 import Layout from './components/Layout';
 import TaskCard from './components/TaskCard';
 import CalendarView from './components/CalendarView';
@@ -704,6 +704,22 @@ const App: React.FC = () => {
     setLoading(false);
   };
 
+  // Kalıcı Olarak Silme (Arşivden)
+  const handlePermanentDelete = async (taskId: string) => {
+      if(!confirm("DİKKAT! Bu işlem geri alınamaz!\n\nGörev veritabanından tamamen silinecek. Devam edilsin mi?")) return;
+      
+      setLoading(true);
+      const success = await permanentlyDeleteTask(taskId);
+      
+      if(success) {
+          setArchivedTasks(prev => prev.filter(t => t.id !== taskId));
+          alert("Görev kalıcı olarak silindi.");
+      } else {
+          alert("Silme işlemi başarısız oldu.");
+      }
+      setLoading(false);
+  };
+
   // USTA TALEP OLUŞTURMA
   const handleCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1048,7 +1064,7 @@ const App: React.FC = () => {
                         task={task} 
                         user={currentUser} 
                         onUpdateStatus={updateTaskStatus}
-                        onDelete={handleDeleteTask}
+                        onDelete={activeTaskTab === 'deleted' ? handlePermanentDelete : handleDeleteTask}
                         onMarkSeen={handleMarkTaskSeen}
                         isArchived={activeTaskTab === 'deleted'}
                     />
