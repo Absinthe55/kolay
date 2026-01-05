@@ -19,6 +19,7 @@ const NOTIFICATION_SOUND = 'https://assets.mixkit.co/active_storage/sfx/2869/286
 const GROUP_IMAGE_URL = 'https://cdn-icons-png.flaticon.com/512/3652/3652191.png'; 
 
 type TaskTab = 'active' | 'history' | 'deleted';
+type AppTab = 'tasks' | 'add' | 'profile' | 'requests' | 'calendar';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -30,7 +31,7 @@ const App: React.FC = () => {
   const [ustaList, setUstaList] = useState<Member[]>(DEFAULT_USTAS);
   
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tasks' | 'add' | 'profile' | 'requests' | 'calendar'>('tasks');
+  const [activeTab, setActiveTab] = useState<AppTab>('tasks');
   const [activeTaskTab, setActiveTaskTab] = useState<TaskTab>('active'); // Görevler alt sekmeleri
 
   // Filtreleme State'i (Sadece Amirler İçin)
@@ -38,7 +39,7 @@ const App: React.FC = () => {
 
   const [connectionId, setConnectionId] = useState(getStoredBinId());
 
-  // Senkronizasyon Zamanlayıcısı (Amir İçin)
+  // Senkronizasyon Zamanlayıcısı
   const [lastSyncTime, setLastSyncTime] = useState<number>(Date.now());
   const [msSinceSync, setMsSinceSync] = useState<number>(0);
   
@@ -81,14 +82,52 @@ const App: React.FC = () => {
   const [pullStartY, setPullStartY] = useState(0);
   const [pullDistance, setPullDistance] = useState(0);
 
-  // Wake Lock (Ekranı Açık Tutma) State
-  const [wakeLock, setWakeLock] = useState<WakeLockSentinel | null>(null);
+  // Wake Lock (Ekranı Açık Tutma) State - Type 'any' used to prevent build errors in environments missing dom types
+  const [wakeLock, setWakeLock] = useState<any | null>(null);
+
+  // GERİ TUŞU YÖNETİMİ (HISTORY API)
+  // Sekme değiştirirken geçmişe ekle
+  const handleTabChange = useCallback((tab: AppTab) => {
+    setActiveTab(tab);
+    // Eğer zaten o sekmedeysek tekrar pushlama
+    try {
+        if (window.location.hash !== `#${tab}`) {
+            window.history.pushState({ tab }, '', `#${tab}`);
+        }
+    } catch (e) {
+        console.warn('History API error:', e);
+    }
+  }, []);
+
+  // Geri tuşunu dinle
+  useEffect(() => {
+    // İlk açılışta history state'i replace et
+    try {
+        window.history.replaceState({ tab: 'tasks' }, '', '#tasks');
+    } catch (e) {
+        // Ignore history errors
+    }
+
+    const handlePopState = (event: PopStateEvent) => {
+        if (event.state && event.state.tab) {
+            setActiveTab(event.state.tab);
+        } else {
+            // State yoksa (örn: dışarıdan linkle gelindiyse) varsayılan tasks
+            setActiveTab('tasks');
+        }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Wake Lock Fonksiyonu
   const toggleWakeLock = async () => {
     if (wakeLock) {
       // Kapat
-      await wakeLock.release();
+      try {
+        await wakeLock.release();
+      } catch (e) { console.error(e); }
       setWakeLock(null);
     } else {
       // Aç
@@ -157,13 +196,17 @@ const App: React.FC = () => {
     }
     
     if (Notification.permission !== 'granted') {
-      const permission = await Notification.requestPermission();
-      if (permission === 'granted') {
-        // Test bildirimi
-        new Notification("Bildirimler Aktif", { 
-            body: "Yeni görev verildiğinde haber vereceğiz.",
-            icon: GROUP_IMAGE_URL
-        });
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            // Test bildirimi
+            new Notification("Bildirimler Aktif", { 
+                body: "Yeni görev verildiğinde haber vereceğiz.",
+                icon: GROUP_IMAGE_URL
+            });
+        }
+      } catch (e) {
+          console.warn("Notification permission error:", e);
       }
     } else {
         alert("Bildirim izni zaten verilmiş.");
@@ -172,20 +215,24 @@ const App: React.FC = () => {
 
   // Bildirim Gönderme Fonksiyonu
   const sendNotification = (title: string, body: string) => {
-      if (Notification.permission === 'granted') {
-          // Titreşim (Mobil için)
-          if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      try {
+          if (Notification.permission === 'granted') {
+              // Titreşim (Mobil için)
+              if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 
-          // Ses
-          const audio = new Audio(NOTIFICATION_SOUND);
-          audio.volume = 1.0;
-          audio.play().catch(e => console.log("Ses çalınamadı:", e));
+              // Ses
+              const audio = new Audio(NOTIFICATION_SOUND);
+              audio.volume = 1.0;
+              audio.play().catch(e => console.log("Ses çalınamadı:", e));
 
-          // Görsel Bildirim
-          new Notification(title, { 
-              body: body,
-              icon: GROUP_IMAGE_URL
-          });
+              // Görsel Bildirim
+              new Notification(title, { 
+                  body: body,
+                  icon: GROUP_IMAGE_URL
+              });
+          }
+      } catch (e) {
+          console.warn("Bildirim gönderilemedi:", e);
       }
   };
 
@@ -216,10 +263,10 @@ const App: React.FC = () => {
     setLoading(false);
   }, [connectionId]);
 
-  // MS Sayacı Efekti (Sadece Amir için arayüzde gösteriliyor ama state hep çalışsın)
+  // MS Sayacı Efekti (Herkese açık - Amir ve Usta)
   useEffect(() => {
       let interval: ReturnType<typeof setInterval>;
-      if (currentUser?.role === 'AMIR') {
+      if (currentUser) {
           interval = setInterval(() => {
               setMsSinceSync(Date.now() - lastSyncTime);
           }, 75); // Ekranı yormasın diye 75ms
@@ -485,7 +532,7 @@ const App: React.FC = () => {
       avatar
     };
     setCurrentUser(user);
-    setActiveTab('tasks'); // Giriş yapınca her zaman Görevler ekranına at
+    handleTabChange('tasks'); // Giriş yapınca Görevler ekranına at ve history'e işle
 
     if (remember) {
       localStorage.setItem(LOCAL_KEY_AUTH, JSON.stringify(user));
@@ -493,7 +540,7 @@ const App: React.FC = () => {
     
     // Giriş yapınca hemen izin iste
     if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission();
+        Notification.requestPermission().catch(console.warn);
     }
   };
 
@@ -841,7 +888,7 @@ const App: React.FC = () => {
     setNewTaskMaster('');
     setNewTaskImage(null);
     if(fileInputRef.current) fileInputRef.current.value = '';
-    setActiveTab('tasks');
+    handleTabChange('tasks'); // Görevler sayfasına yönlendir (History push ile)
   };
 
   // GÖREV GÖRÜLDÜ İŞARETLEME
@@ -1213,7 +1260,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <Layout user={currentUser} onLogout={handleLogout} activeTab={activeTab} setActiveTab={setActiveTab}>
+    <Layout user={currentUser} onLogout={handleLogout} activeTab={activeTab} setActiveTab={handleTabChange}>
       {/* 1. SEKME: GÖREV LİSTESİ */}
       {activeTab === 'tasks' && (
         <div className="space-y-4 pb-20">
@@ -1573,39 +1620,37 @@ const App: React.FC = () => {
                 </div>
            </div>
 
-           {/* Sistem Durumu (Amir) */}
-           {currentUser.role === 'AMIR' && (
-               <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-                    <h4 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                        <i className="fas fa-server text-blue-500"></i> Sistem Durumu
-                    </h4>
-                    
-                    <div className="space-y-3">
-                        <div className="flex justify-between items-center text-xs">
-                             <span className="text-slate-400">Veri Tabanı:</span>
-                             <span className="text-emerald-400 font-bold flex items-center gap-1">
-                                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                                 Npoint.io (Aktif)
-                             </span>
-                        </div>
-                        <div className="flex justify-between items-center text-xs">
-                             <span className="text-slate-400">Son Senkronizasyon:</span>
-                             <span className="text-slate-300 font-mono">{msSinceSync}ms önce</span>
-                        </div>
-                        <div className="bg-slate-900 p-2 rounded text-[10px] text-slate-500 font-mono break-all border border-slate-700">
-                             BIN ID: {connectionId || 'Bağlı Değil'}
-                        </div>
-                        <div className="pt-2 flex gap-2">
-                             <button onClick={() => loadData()} className="flex-1 bg-blue-600/20 text-blue-400 py-2 rounded-lg text-xs font-bold hover:bg-blue-600/40 transition-colors">
-                                 <i className="fas fa-sync-alt mr-1"></i> Zorla Yenile
-                             </button>
-                             <button onClick={requestNotificationPermission} className="flex-1 bg-purple-600/20 text-purple-400 py-2 rounded-lg text-xs font-bold hover:bg-purple-600/40 transition-colors">
-                                 <i className="fas fa-bell mr-1"></i> Bildirim İzni
-                             </button>
-                        </div>
+           {/* Sistem Durumu (HERKES İÇİN) */}
+           <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                <h4 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                    <i className="fas fa-server text-blue-500"></i> Sistem Durumu
+                </h4>
+                
+                <div className="space-y-3">
+                    <div className="flex justify-between items-center text-xs">
+                         <span className="text-slate-400">Veri Tabanı:</span>
+                         <span className="text-emerald-400 font-bold flex items-center gap-1">
+                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                             Npoint.io (Aktif)
+                         </span>
                     </div>
-               </div>
-           )}
+                    <div className="flex justify-between items-center text-xs">
+                         <span className="text-slate-400">Son Senkronizasyon:</span>
+                         <span className="text-slate-300 font-mono">{msSinceSync}ms önce</span>
+                    </div>
+                    <div className="bg-slate-900 p-2 rounded text-[10px] text-slate-500 font-mono break-all border border-slate-700">
+                         BIN ID: {connectionId || 'Bağlı Değil'}
+                    </div>
+                    <div className="pt-2 flex gap-2">
+                         <button onClick={() => loadData()} className="flex-1 bg-blue-600/20 text-blue-400 py-2 rounded-lg text-xs font-bold hover:bg-blue-600/40 transition-colors">
+                             <i className="fas fa-sync-alt mr-1"></i> Zorla Yenile
+                         </button>
+                         <button onClick={requestNotificationPermission} className="flex-1 bg-purple-600/20 text-purple-400 py-2 rounded-lg text-xs font-bold hover:bg-purple-600/40 transition-colors">
+                             <i className="fas fa-bell mr-1"></i> Bildirim İzni
+                         </button>
+                    </div>
+                </div>
+           </div>
 
            {/* Personel Yönetimi (HERKES GÖREBİLİR - AMA SADECE AMİR DÜZENLER) */}
            <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700">
