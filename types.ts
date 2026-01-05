@@ -65,6 +65,7 @@ export interface Member {
   name: string;
   password?: string;
   phoneNumber?: string; // Whatsapp için telefon numarası
+  lastActive?: number; // Online durumu için son aktif zamanı
 }
 
 export interface AppState {

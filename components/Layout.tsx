@@ -10,6 +10,9 @@ interface LayoutProps {
   setActiveTab: (tab: 'tasks' | 'add' | 'profile' | 'requests' | 'calendar') => void;
 }
 
+// Resim URL'si (App.tsx ile aynı veya props olarak geçilebilir, şimdilik sabit)
+const GROUP_IMAGE_URL = 'https://cdn-icons-png.flaticon.com/512/3652/3652191.png';
+
 const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, activeTab, setActiveTab }) => {
   if (!user) return <div className="min-h-screen bg-slate-900">{children}</div>;
 
@@ -18,8 +21,8 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, activeTab, se
       <header className="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 p-4 sticky top-0 z-50 transition-all">
         <div className="container mx-auto max-w-lg flex justify-between items-center">
             <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-900/20">
-                <i className="fas fa-oil-can text-lg"></i>
+            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center shadow-lg overflow-hidden border border-white/10">
+                <img src={GROUP_IMAGE_URL} alt="Logo" className="w-full h-full object-cover" />
             </div>
             <div className="leading-tight">
                 <h1 className="font-black text-slate-100 tracking-tight text-lg">HİDROLİK</h1>

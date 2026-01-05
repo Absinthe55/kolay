@@ -6,20 +6,9 @@ import Layout from './components/Layout';
 import TaskCard from './components/TaskCard';
 import CalendarView from './components/CalendarView';
 
-// Varsayılan listeler (İlk kurulum veya yerel mod için)
-const DEFAULT_AMIRS: Member[] = [
-    { name: 'Birim Amiri ERKAN ÇİLİNGİR' }, 
-    { name: 'Vardiya Amiri Selçuk' }, 
-    { name: 'Birim Amiri Volkan' }
-];
-const DEFAULT_USTAS: Member[] = [
-    { name: 'Usta Ahmet' }, 
-    { name: 'Usta Mehmet' }, 
-    { name: 'Usta Can' }, 
-    { name: 'Usta Serkan' }, 
-    { name: 'Usta Osman' }, 
-    { name: 'Usta İbrahim' }
-];
+// Varsayılan listeler BOŞ (Senkronizasyon ile gelecek)
+const DEFAULT_AMIRS: Member[] = [];
+const DEFAULT_USTAS: Member[] = [];
 
 // Otomatik bağlanılacak Npoint adresi
 const AUTO_CONNECT_URL = 'https://www.npoint.io/docs/c85115e1d1b4c3276a86';
@@ -27,6 +16,8 @@ const AUTO_CONNECT_URL = 'https://www.npoint.io/docs/c85115e1d1b4c3276a86';
 const LOCAL_KEY_AUTH = 'hidro_auth';
 // Bildirim sesi (Kısa bip sesi)
 const NOTIFICATION_SOUND = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+// Grup Resmi URL
+const GROUP_IMAGE_URL = 'https://cdn-icons-png.flaticon.com/512/3652/3652191.png'; // Buraya ekteki resmin URL'sini koyabilirsiniz.
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -99,6 +90,12 @@ const App: React.FC = () => {
     }
   };
 
+  // Online Durumu Kontrolü (Son 2 dakika)
+  const isUserOnline = (lastActive?: number) => {
+      if (!lastActive) return false;
+      return (Date.now() - lastActive) < 2 * 60 * 1000; // 2 dakika
+  };
+
   // Bildirim İzni İsteme Fonksiyonu
   const requestNotificationPermission = async () => {
     if (!('Notification' in window)) {
@@ -112,7 +109,7 @@ const App: React.FC = () => {
         // Test bildirimi
         new Notification("Bildirimler Aktif", { 
             body: "Yeni görev verildiğinde haber vereceğiz.",
-            icon: "https://cdn-icons-png.flaticon.com/512/3652/3652191.png"
+            icon: GROUP_IMAGE_URL
         });
       }
     } else {
@@ -134,7 +131,7 @@ const App: React.FC = () => {
           // Görsel Bildirim
           new Notification(title, { 
               body: body,
-              icon: "https://cdn-icons-png.flaticon.com/512/10337/10337229.png" // İş/Tamir ikonu
+              icon: GROUP_IMAGE_URL
           });
       }
   };
@@ -155,11 +152,67 @@ const App: React.FC = () => {
         isFirstLoadRef.current = false;
     }
 
-    if (data.amirs && data.amirs.length > 0) setAmirList(data.amirs);
-    if (data.ustas && data.ustas.length > 0) setUstaList(data.ustas);
+    // Listeleri güncelle
+    if (data.amirs) setAmirList(data.amirs);
+    if (data.ustas) setUstaList(data.ustas);
     
     setLoading(false);
   }, [connectionId]);
+
+  // Online Heartbeat (Her 60 saniyede bir lastActive günceller)
+  useEffect(() => {
+    if (!currentUser || !connectionId) return;
+
+    const sendHeartbeat = async () => {
+        // Mevcut veriyi çek, güncelle ve kaydet
+        const data = await fetchAppData(connectionId);
+        let updatedAmirs = [...data.amirs];
+        let updatedUstas = [...data.ustas];
+        const now = Date.now();
+
+        let changed = false;
+
+        if (currentUser.role === 'AMIR') {
+            updatedAmirs = updatedAmirs.map(m => {
+                if(m.name === currentUser.name) {
+                    changed = true;
+                    return { ...m, lastActive: now };
+                }
+                return m;
+            });
+        } else {
+             updatedUstas = updatedUstas.map(m => {
+                if(m.name === currentUser.name) {
+                    changed = true;
+                    return { ...m, lastActive: now };
+                }
+                return m;
+            });
+        }
+
+        if (changed) {
+            // Local state'i güncelle (arayüz hemen tepki versin)
+            if (currentUser.role === 'AMIR') setAmirList(updatedAmirs);
+            else setUstaList(updatedUstas);
+
+            // DB kaydet
+            await saveAppData({ 
+                tasks: data.tasks, 
+                requests: data.requests, 
+                leaves: data.leaves, 
+                amirs: updatedAmirs, 
+                ustas: updatedUstas 
+            }, connectionId);
+        }
+    };
+
+    // İlk girişte hemen gönder
+    sendHeartbeat();
+
+    const interval = setInterval(sendHeartbeat, 60000); // 1 dakika
+    return () => clearInterval(interval);
+  }, [currentUser, connectionId]);
+
 
   // Otomatik Bağlantı, Periyodik Güncelleme ve Bildirim Kontrolü
   useEffect(() => {
@@ -196,8 +249,8 @@ const App: React.FC = () => {
              data.tasks.forEach(t => lastTaskIdsRef.current.add(t.id));
              isFirstLoadRef.current = false;
 
-             if (data.amirs.length > 0) setAmirList(data.amirs);
-             if (data.ustas.length > 0) setUstaList(data.ustas);
+             if (data.amirs) setAmirList(data.amirs);
+             if (data.ustas) setUstaList(data.ustas);
           }
        }
     };
@@ -211,8 +264,8 @@ const App: React.FC = () => {
             setTasks(data.tasks);
             setRequests(data.requests);
             setLeaves(data.leaves);
-            if (data.amirs.length > 0) setAmirList(data.amirs);
-            if (data.ustas.length > 0) setUstaList(data.ustas);
+            if (data.amirs) setAmirList(data.amirs);
+            if (data.ustas) setUstaList(data.ustas);
 
             // BİLDİRİM MANTIĞI
             if (currentUser) {
@@ -307,8 +360,11 @@ const App: React.FC = () => {
   const handleCreateConnection = async () => {
     if(!confirm("Otomatik bağlantı oluşturulacak. Devam?")) return;
     
+    // Varsayılan boş listeler yerine en azından bir yönetici olsun
+    const initialAmirs = [{ name: 'Birim Amiri' }]; 
+    
     setLoading(true);
-    const newId = await createNewBin(amirList, ustaList);
+    const newId = await createNewBin(initialAmirs, []);
     setLoading(false);
     
     if (newId) {
@@ -376,7 +432,8 @@ const App: React.FC = () => {
     const newMember: Member = {
         name: newMemberName.trim(),
         password: newMemberPassword.trim() || undefined,
-        phoneNumber: cleanedPhone || undefined
+        phoneNumber: cleanedPhone || undefined,
+        lastActive: 0
     };
 
     if (newMemberRole === 'AMIR') {
@@ -685,8 +742,8 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-slate-900 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-6 text-white overflow-y-auto relative">
         <div className="w-full max-w-sm animate-in zoom-in duration-500">
           <div className="flex flex-col items-center mb-10">
-            <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-6 rounded-[2rem] shadow-[0_0_40px_rgba(37,99,235,0.3)] mb-6 ring-4 ring-white/10">
-              <i className="fas fa-oil-can text-5xl text-white drop-shadow-md"></i>
+            <div className="bg-white/5 p-4 rounded-3xl shadow-[0_0_40px_rgba(59,130,246,0.2)] mb-6 ring-4 ring-white/10 backdrop-blur-sm">
+               <img src={GROUP_IMAGE_URL} alt="Grup Resmi" className="w-32 h-32 object-contain drop-shadow-md" />
             </div>
             <h1 className="text-4xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-white">HidroGörev</h1>
             <p className="text-slate-400 mt-2 text-center text-sm font-medium tracking-wide">Fabrika Hidrolik Takip Sistemi</p>
@@ -700,11 +757,17 @@ const App: React.FC = () => {
                  <h2 className="text-xs font-bold text-blue-200 uppercase tracking-widest">Yönetim</h2>
               </div>
               <div className="grid grid-cols-1 gap-2">
+                {amirList.length === 0 && <p className="text-xs text-slate-500 italic p-2">Liste boş, senkronizasyon bekleniyor...</p>}
                 {amirList.map(member => (
                   <button key={member.name} onClick={() => handleLoginClick(member, 'AMIR')} className="group relative bg-slate-800/50 hover:bg-blue-600 border border-white/5 p-4 rounded-2xl text-left font-bold transition-all duration-300 flex justify-between items-center overflow-hidden">
                     <div className="absolute inset-0 bg-blue-400/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
                     <span className="text-slate-200 group-hover:text-white relative z-10 flex items-center gap-3">
-                        <i className="fas fa-user-tie text-blue-400 group-hover:text-white/80"></i>
+                        <div className="relative">
+                            <i className="fas fa-user-tie text-blue-400 group-hover:text-white/80"></i>
+                            {isUserOnline(member.lastActive) && (
+                                <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-green-500 border-2 border-slate-800 rounded-full"></span>
+                            )}
+                        </div>
                         {member.name}
                         {member.password && <i className="fas fa-lock text-[10px] text-slate-500 group-hover:text-white/50"></i>}
                     </span>
@@ -722,11 +785,17 @@ const App: React.FC = () => {
                  <h2 className="text-xs font-bold text-emerald-200 uppercase tracking-widest">Saha Ekibi</h2>
               </div>
               <div className="grid grid-cols-1 gap-2">
+                {ustaList.length === 0 && <p className="text-xs text-slate-500 italic p-2">Liste boş, senkronizasyon bekleniyor...</p>}
                 {ustaList.map(member => (
                   <button key={member.name} onClick={() => handleLoginClick(member, 'USTA')} className="group relative bg-slate-800/50 hover:bg-emerald-600 border border-white/5 p-4 rounded-2xl text-left font-bold transition-all duration-300 flex justify-between items-center overflow-hidden">
                     <div className="absolute inset-0 bg-emerald-400/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
                     <span className="text-slate-200 group-hover:text-white relative z-10 flex items-center gap-3">
-                        <i className="fas fa-wrench text-emerald-400 group-hover:text-white/80"></i>
+                        <div className="relative">
+                            <i className="fas fa-wrench text-emerald-400 group-hover:text-white/80"></i>
+                            {isUserOnline(member.lastActive) && (
+                                <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-green-500 border-2 border-slate-800 rounded-full"></span>
+                            )}
+                        </div>
                         {member.name}
                         {member.password && <i className="fas fa-lock text-[10px] text-slate-500 group-hover:text-white/50"></i>}
                     </span>
@@ -735,8 +804,20 @@ const App: React.FC = () => {
                 ))}
               </div>
             </section>
+            
+            {!connectionId && (
+                <div className="pt-4 text-center">
+                    <button onClick={handleJoinConnection} className="text-xs text-blue-400 hover:text-white underline">
+                        Bir gruba katıl veya senkronize et
+                    </button>
+                    <div className="h-2"></div>
+                    <button onClick={handleCreateConnection} className="text-[10px] text-slate-600 hover:text-slate-400">
+                        Yeni Grup Oluştur
+                    </button>
+                </div>
+            )}
           </div>
-          <p className="text-center text-[10px] text-slate-600 mt-6 font-mono">v1.3 &bull; Güvenli Bağlantı</p>
+          <p className="text-center text-[10px] text-slate-600 mt-6 font-mono">v1.4 &bull; Güvenli Bağlantı</p>
         </div>
 
         {/* Login Password Modal */}
@@ -1066,8 +1147,13 @@ const App: React.FC = () => {
                             <p className="text-xs font-bold text-slate-500 mb-2 uppercase">Amirler</p>
                             <div className="flex flex-wrap gap-2">
                                 {amirList.map(m => (
-                                    <div key={m.name} className="bg-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                                        <span className="text-xs text-slate-200 font-bold">{m.name}</span>
+                                    <div key={m.name} className="bg-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2 border border-slate-600">
+                                        <div className="relative">
+                                            <span className="text-xs text-slate-200 font-bold">{m.name}</span>
+                                            {isUserOnline(m.lastActive) && (
+                                                <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-slate-700"></span>
+                                            )}
+                                        </div>
                                         <div className="flex items-center gap-1 ml-1">
                                             <button onClick={() => setPasswordChangeModal({ show: true, memberName: m.name, role: 'AMIR' })} className="text-slate-400 hover:text-blue-400"><i className="fas fa-key text-[10px]"></i></button>
                                             {isErkan && m.name !== 'Birim Amiri ERKAN ÇİLİNGİR' && (
@@ -1082,8 +1168,13 @@ const App: React.FC = () => {
                             <p className="text-xs font-bold text-slate-500 mb-2 uppercase">Ustalar</p>
                             <div className="flex flex-wrap gap-2">
                                 {ustaList.map(m => (
-                                    <div key={m.name} className="bg-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                                        <span className="text-xs text-slate-200 font-bold">{m.name}</span>
+                                    <div key={m.name} className="bg-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2 border border-slate-600">
+                                        <div className="relative">
+                                            <span className="text-xs text-slate-200 font-bold">{m.name}</span>
+                                            {isUserOnline(m.lastActive) && (
+                                                <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-slate-700"></span>
+                                            )}
+                                        </div>
                                         <div className="flex items-center gap-1 ml-1">
                                              <button onClick={() => setPasswordChangeModal({ show: true, memberName: m.name, role: 'USTA' })} className="text-slate-400 hover:text-blue-400"><i className="fas fa-key text-[10px]"></i></button>
                                              <button onClick={() => handleRemoveMember(m.name, 'USTA')} className="text-slate-400 hover:text-red-400"><i className="fas fa-times text-[10px]"></i></button>
@@ -1151,7 +1242,7 @@ const App: React.FC = () => {
 
             <div className="text-center pt-8 opacity-40">
                 <i className="fas fa-oil-can text-4xl mb-2 text-slate-500"></i>
-                <p className="text-[10px] font-mono text-slate-500">Hidrolik Takip v1.3</p>
+                <p className="text-[10px] font-mono text-slate-500">Hidrolik Takip v1.4</p>
             </div>
         </div>
       )}
