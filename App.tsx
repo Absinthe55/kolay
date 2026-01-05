@@ -17,7 +17,7 @@ const LOCAL_KEY_AUTH = 'hidro_auth';
 // Bildirim sesi (Kısa bip sesi)
 const NOTIFICATION_SOUND = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
 // Grup Resmi URL
-const GROUP_IMAGE_URL = 'https://cdn-icons-png.flaticon.com/512/3652/3652191.png'; // Buraya ekteki resmin URL'sini koyabilirsiniz.
+const GROUP_IMAGE_URL = 'https://cdn-icons-png.flaticon.com/512/3652/3652191.png'; 
 
 type TaskTab = 'active' | 'history' | 'deleted';
 
@@ -198,7 +198,7 @@ const App: React.FC = () => {
     setTasks(data.tasks);
     setRequests(data.requests);
     setLeaves(data.leaves);
-    setArchivedTasks(data.deletedTasks); // YENİ: Artık ana veriden geliyor
+    setArchivedTasks(data.deletedTasks); 
     
     // İlk yüklemede mevcut ID'leri kaydet ki bildirim gitmesin
     if (isFirstLoadRef.current && data.tasks.length > 0) {
@@ -224,20 +224,85 @@ const App: React.FC = () => {
       return () => clearInterval(interval);
   }, [lastSyncTime, currentUser]);
 
-  // Online Heartbeat (Her 10 saniyede bir lastActive günceller - DAHA SIK)
+  // Online Heartbeat & Location Tracking (Her 10 saniyede bir)
   useEffect(() => {
     if (!currentUser || !connectionId) return;
 
     const sendHeartbeat = async () => {
-        // Mevcut veriyi çek, güncelle ve kaydet
+        // Mevcut veriyi çek
         const data = await fetchAppData(connectionId);
         let updatedAmirs = [...data.amirs];
         let updatedUstas = [...data.ustas];
         const now = Date.now();
-
         let changed = false;
 
-        if (currentUser.role === 'AMIR') {
+        // Yardımcı fonksiyon: Veriyi kaydet
+        const persistHeartbeat = async (amirs: Member[], ustas: Member[]) => {
+             // Local state'i güncelle (arayüz hemen tepki versin)
+            if (currentUser.role === 'AMIR') setAmirList(amirs);
+            else setUstaList(ustas);
+
+            // DB kaydet
+            await saveAppData({ 
+                tasks: data.tasks, 
+                requests: data.requests, 
+                leaves: data.leaves, 
+                amirs: amirs, 
+                ustas: ustas,
+                deletedTasks: data.deletedTasks
+            }, connectionId);
+        };
+
+        // Eğer kullanıcı USTA ise, konum almaya çalış
+        if (currentUser.role === 'USTA') {
+            if ('geolocation' in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    async (position) => {
+                        // Konum başarıyla alındı
+                        updatedUstas = updatedUstas.map(m => {
+                            if (m.name === currentUser.name) {
+                                changed = true;
+                                return { 
+                                    ...m, 
+                                    lastActive: now,
+                                    latitude: position.coords.latitude,
+                                    longitude: position.coords.longitude
+                                };
+                            }
+                            return m;
+                        });
+                        
+                        // Konum alındıktan sonra kaydet
+                        if(changed) await persistHeartbeat(updatedAmirs, updatedUstas);
+                    },
+                    async (error) => {
+                        console.warn("Konum alınamadı:", error);
+                        // Konum alınamazsa bile online durumunu güncelle
+                        updatedUstas = updatedUstas.map(m => {
+                            if (m.name === currentUser.name) {
+                                changed = true;
+                                return { ...m, lastActive: now };
+                            }
+                            return m;
+                        });
+                        if(changed) await persistHeartbeat(updatedAmirs, updatedUstas);
+                    },
+                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+                );
+            } else {
+                // Tarayıcı desteklemiyorsa sadece active güncelle
+                updatedUstas = updatedUstas.map(m => {
+                    if (m.name === currentUser.name) {
+                        changed = true;
+                        return { ...m, lastActive: now };
+                    }
+                    return m;
+                });
+                if(changed) await persistHeartbeat(updatedAmirs, updatedUstas);
+            }
+        } 
+        // Kullanıcı AMİR ise
+        else if (currentUser.role === 'AMIR') {
             updatedAmirs = updatedAmirs.map(m => {
                 if(m.name === currentUser.name) {
                     changed = true;
@@ -245,37 +310,14 @@ const App: React.FC = () => {
                 }
                 return m;
             });
-        } else {
-             updatedUstas = updatedUstas.map(m => {
-                if(m.name === currentUser.name) {
-                    changed = true;
-                    return { ...m, lastActive: now };
-                }
-                return m;
-            });
-        }
-
-        if (changed) {
-            // Local state'i güncelle (arayüz hemen tepki versin)
-            if (currentUser.role === 'AMIR') setAmirList(updatedAmirs);
-            else setUstaList(updatedUstas);
-
-            // DB kaydet
-            await saveAppData({ 
-                tasks: data.tasks, 
-                requests: data.requests, 
-                leaves: data.leaves, 
-                amirs: updatedAmirs, 
-                ustas: updatedUstas,
-                deletedTasks: data.deletedTasks // deletedTasks'i de koru
-            }, connectionId);
+            if(changed) await persistHeartbeat(updatedAmirs, updatedUstas);
         }
     };
 
     // İlk girişte hemen gönder
     sendHeartbeat();
 
-    const interval = setInterval(sendHeartbeat, 10000); // 10 saniye (Daha sık heartbeat)
+    const interval = setInterval(sendHeartbeat, 10000); // 10 saniye
     return () => clearInterval(interval);
   }, [currentUser, connectionId]);
 
@@ -1463,6 +1505,18 @@ const App: React.FC = () => {
                                             )}
                                         </div>
                                         <div className="flex items-center gap-1 ml-1">
+                                             {/* KONUM İKONU */}
+                                             {m.latitude && m.longitude && (
+                                                 <a 
+                                                    href={`https://www.google.com/maps?q=${m.latitude},${m.longitude}`} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="text-slate-400 hover:text-red-500 mx-1"
+                                                    title="Konumu Gör"
+                                                 >
+                                                     <i className="fas fa-map-marker-alt text-[10px]"></i>
+                                                 </a>
+                                             )}
                                              <button onClick={() => setPasswordChangeModal({ show: true, memberName: m.name, role: 'USTA' })} className="text-slate-400 hover:text-blue-400"><i className="fas fa-key text-[10px]"></i></button>
                                              <button onClick={() => handleRemoveMember(m.name, 'USTA')} className="text-slate-400 hover:text-red-400"><i className="fas fa-times text-[10px]"></i></button>
                                         </div>

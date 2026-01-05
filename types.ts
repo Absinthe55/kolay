@@ -67,6 +67,8 @@ export interface Member {
   password?: string;
   phoneNumber?: string; // Whatsapp için telefon numarası
   lastActive?: number; // Online durumu için son aktif zamanı
+  latitude?: number; // YENİ: Enlem
+  longitude?: number; // YENİ: Boylam
 }
 
 export interface AppState {
