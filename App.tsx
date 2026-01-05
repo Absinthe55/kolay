@@ -74,6 +74,10 @@ const App: React.FC = () => {
   const lastTaskIdsRef = useRef<Set<string>>(new Set());
   const isFirstLoadRef = useRef(true);
 
+  // Pull to Refresh State
+  const [pullStartY, setPullStartY] = useState(0);
+  const [pullDistance, setPullDistance] = useState(0);
+
   // Wake Lock (Ekranı Açık Tutma) State
   const [wakeLock, setWakeLock] = useState<WakeLockSentinel | null>(null);
 
@@ -378,6 +382,31 @@ const App: React.FC = () => {
         document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [connectionId, loadData, currentUser]); 
+
+  // PULL TO REFRESH HANDLERS
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0) {
+        setPullStartY(e.touches[0].clientY);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const touchY = e.touches[0].clientY;
+    const diff = touchY - pullStartY;
+    
+    // Sadece en tepedeyken ve aşağı çekiliyorsa
+    if (window.scrollY === 0 && diff > 0 && pullStartY > 0) {
+         setPullDistance(diff > 150 ? 150 : diff); // Max 150px esneme
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (pullDistance > 80) { // 80px'den fazla çekildiyse yenile
+         await loadData();
+    }
+    setPullDistance(0);
+    setPullStartY(0);
+  };
 
   const handleLoginClick = (member: Member, role: 'AMIR' | 'USTA') => {
       if (member.password && member.password.trim() !== '') {
@@ -1087,7 +1116,22 @@ const App: React.FC = () => {
       </div>
 
       {activeTab === 'tasks' && (
-        <div className="animate-in fade-in duration-500 pb-24">
+        <div 
+            className="animate-in fade-in duration-500 pb-24"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+        >
+          {/* Custom Pull to Refresh Indicator */}
+          <div 
+            className={`flex items-center justify-center overflow-hidden transition-all duration-200 ${pullDistance > 0 ? 'opacity-100' : 'opacity-0'}`} 
+            style={{height: `${pullDistance}px`}}
+          >
+             <div className={`w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center shadow-lg border border-slate-700 transition-all ${pullDistance > 80 ? 'scale-110 border-blue-500' : 'scale-100'}`}>
+                <i className={`fas fa-sync-alt ${pullDistance > 80 ? 'animate-spin text-blue-400' : 'text-slate-500'} transition-all`} style={{transform: `rotate(${pullDistance * 2}deg)`}}></i>
+             </div>
+          </div>
+
           <div className="flex justify-between items-end mb-6 px-1">
             <div>
                 <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Hoş Geldiniz,</p>
