@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Task, User, TaskStatus, TaskPriority, Member, UstaRequest, RequestStatus, LeaveRequest } from './types';
 import { fetchAppData, saveAppData, createNewBin, getStoredBinId, setStoredBinId, extractBinId, checkConnection } from './services/dbService';
@@ -10,7 +9,7 @@ import CalendarView from './components/CalendarView';
 const DEFAULT_AMIRS: Member[] = [];
 const DEFAULT_USTAS: Member[] = [];
 
-// Otomatik bağlanılacak Npoint adresi
+// Otomatik bağlanılacak NPOINT adresi
 const AUTO_CONNECT_URL = 'https://www.npoint.io/docs/c85115e1d1b4c3276a86';
 // Yerel depolamada yetkilendirme anahtarı
 const LOCAL_KEY_AUTH = 'hidro_auth';
@@ -700,23 +699,19 @@ const App: React.FC = () => {
     await saveAppData({ tasks: updatedTasks, requests, leaves, amirs: amirList, ustas: ustaList, deletedTasks: archivedTasks }, connectionId);
     setLoading(false);
     
-    // SMS ENTEGRASYONU
+    // WHATSAPP ENTEGRASYONU
     const assignedUsta = ustaList.find(u => u.name === newTaskMaster);
     if (assignedUsta && assignedUsta.phoneNumber) {
-        // SMS Metni
-        const message = `🔧 YENİ HİDROLİK GÖREVİ\n\nMakine: ${newTaskMachine}\nÖncelik: ${newTaskPriority}\nİş Emri: ${newTaskDescription}\n\nLütfen HidroGörev uygulamasından onaylayınız.`;
+        // Whatsapp Link Oluşturma
+        const message = `*🔧 YENİ HİDROLİK GÖREVİ*\n\n*Makine:* ${newTaskMachine}\n*Öncelik:* ${newTaskPriority}\n*İş Emri:* ${newTaskDescription}\n\nLütfen HidroGörev uygulamasından onaylayınız.`;
+        const waUrl = `https://wa.me/${assignedUsta.phoneNumber}?text=${encodeURIComponent(message)}`;
         
-        // iOS ve Android uyumluluğu için
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        const separator = isIOS ? '&' : '?';
-        
-        const smsUrl = `sms:${assignedUsta.phoneNumber}${separator}body=${encodeURIComponent(message)}`;
-        
-        if(confirm(`${newTaskMaster} adlı ustaya SMS mesajı oluşturulsun mu?`)) {
-            window.location.href = smsUrl;
+        // Kullanıcıya sor veya direkt aç (Mobil tarayıcılarda pop-up engelleyici olabilir, bu yüzden confirm kullanıyoruz)
+        if(confirm(`${newTaskMaster} adlı ustaya WhatsApp bildirimi gönderilsin mi?`)) {
+            window.open(waUrl, '_blank');
         }
     } else {
-        alert("Görev yayınlandı. (Ustanın telefon numarası kayıtlı olmadığı için SMS ekranı açılamadı)");
+        alert("Görev yayınlandı. (Ustanın telefon numarası kayıtlı olmadığı için WhatsApp açılmadı)");
     }
     
     setNewTaskMachine('');
@@ -934,7 +929,6 @@ const App: React.FC = () => {
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-slate-900 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-6 text-white overflow-y-auto relative">
-        {/* ... (Login UI Code remains same) ... */}
         <div className="w-full max-w-sm animate-in zoom-in duration-500">
           <div className="flex flex-col items-center mb-10">
             <div className="bg-white/5 p-4 rounded-3xl shadow-[0_0_40px_rgba(59,130,246,0.2)] mb-6 ring-4 ring-white/10 backdrop-blur-sm">
@@ -1084,534 +1078,527 @@ const App: React.FC = () => {
     );
   }
 
-  // USTA FİLTRELEME UI RENDER (SADECE AMİR)
-  const renderUstaFilter = () => {
-    if (currentUser?.role !== 'AMIR') return null; // Sadece Amir görür
-    return (
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 no-scrollbar">
-            <button
-                onClick={() => setSelectedUstaFilter('ALL')}
-                className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition-all border ${selectedUstaFilter === 'ALL' ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/40' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
-            >
-                <i className="fas fa-users mr-2"></i>Tümü
-            </button>
-            {ustaList.map(u => (
-                <button
-                    key={u.name}
-                    onClick={() => setSelectedUstaFilter(u.name)}
-                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition-all border ${selectedUstaFilter === u.name ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/40' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
-                >
-                    <i className="fas fa-user mr-2"></i>{u.name}
-                </button>
-            ))}
-        </div>
-    );
-  };
-
-  // Görevleri sekmeye göre filtreleme mantığı
-  const getFilteredTasks = () => {
-      // 1. Önce kullanıcı rolüne göre filtrele
-      
-      let sourceTasks = tasks;
-      if (activeTaskTab === 'deleted') {
-          sourceTasks = archivedTasks;
-      }
-
-      let filtered = sourceTasks;
-
-      // USTA ise sadece kendi görevleri
-      if (currentUser.role === 'USTA') {
-          filtered = sourceTasks.filter(t => t.masterName === currentUser.name);
-      } 
-      // AMİR ise ve filtre seçiliyse
-      else if (currentUser.role === 'AMIR' && selectedUstaFilter !== 'ALL') {
-          filtered = sourceTasks.filter(t => t.masterName === selectedUstaFilter);
-      }
-
-      // 2. Sekmeye göre durum filtresi
-      if (activeTaskTab === 'active') {
-          return filtered.filter(t => t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.CANCELLED);
-      } else if (activeTaskTab === 'history') {
-          return filtered.filter(t => t.status === TaskStatus.COMPLETED || t.status === TaskStatus.CANCELLED);
-      } else {
-          // deleted
-          return filtered; // Zaten archivedTasks'dan geliyor
-      }
-  };
-
-  const filteredTasks = getFilteredTasks();
-
-  // Talepleri filtrele: Usta ise sadece kendininkileri, Amir ise seçili filtreye göre
-  const filteredRequests = requests.filter(r => {
-      if (currentUser.role === 'USTA') return r.ustaName === currentUser.name;
-      // Amir ve filtre seçili
-      if (currentUser.role === 'AMIR' && selectedUstaFilter !== 'ALL') return r.ustaName === selectedUstaFilter;
-      // Amir ve tümü
-      return true;
-  });
-
-  const isErkan = currentUser.name === 'Birim Amiri ERKAN ÇİLİNGİR';
-
   return (
     <Layout user={currentUser} onLogout={handleLogout} activeTab={activeTab} setActiveTab={setActiveTab}>
-      <div className={`px-4 py-2 mb-6 rounded-full text-[10px] font-bold flex justify-center items-center shadow-sm mx-auto w-fit transition-colors ${connectionId ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-800/50' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
-        <span className="flex items-center gap-1.5">
-           <span className={`w-2 h-2 rounded-full ${connectionId ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`}></span>
-           {connectionId ? 'Canlı Senkronizasyon Aktif' : 'Çevrimdışı / Yerel Mod'}
-        </span>
-      </div>
-
+      {/* 1. SEKME: GÖREV LİSTESİ */}
       {activeTab === 'tasks' && (
-        <div 
-            className="animate-in fade-in duration-500 pb-24"
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-        >
-          {/* Custom Pull to Refresh Indicator */}
-          <div 
-            className={`flex items-center justify-center overflow-hidden transition-all duration-200 ${pullDistance > 0 ? 'opacity-100' : 'opacity-0'}`} 
-            style={{height: `${pullDistance}px`}}
-          >
-             <div className={`w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center shadow-lg border border-slate-700 transition-all ${pullDistance > 80 ? 'scale-110 border-blue-500' : 'scale-100'}`}>
-                <i className={`fas fa-sync-alt ${pullDistance > 80 ? 'animate-spin text-blue-400' : 'text-slate-500'} transition-all`} style={{transform: `rotate(${pullDistance * 2}deg)`}}></i>
-             </div>
-          </div>
-
-          <div className="flex justify-between items-end mb-6 px-1">
-            <div>
-                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Hoş Geldiniz,</p>
-                <h2 className="text-3xl font-black text-slate-100 tracking-tight leading-none">{currentUser.name.split(' ')[0]} Bey</h2>
-            </div>
-            <div className="flex flex-col items-end gap-1">
-                <button onClick={() => loadData()} disabled={loading} className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-slate-800 border border-slate-700 text-blue-500 shadow-lg shadow-blue-900/20 hover:shadow-xl hover:bg-slate-750 transition-all ${loading ? 'animate-spin' : ''}`}>
-                    <i className="fas fa-sync-alt"></i>
-                </button>
-                {/* Amir için MS Sayacı */}
+        <div className="space-y-4 pb-20">
+           {/* Üst Kısım: Başlık ve Filtreler */}
+           <div className="flex justify-between items-center mb-2">
+                <h2 className="text-2xl font-black text-slate-100 flex items-center gap-2">
+                    <i className="fas fa-list-ul text-blue-500"></i>
+                    İş Emirleri
+                </h2>
+                
+                {/* Usta Filtresi (Sadece Amirler İçin) */}
                 {currentUser.role === 'AMIR' && (
-                    <span className="text-[9px] font-mono text-slate-500 bg-slate-800/50 px-1.5 py-0.5 rounded border border-slate-800">
-                        {msSinceSync}ms
-                    </span>
+                    <select 
+                        value={selectedUstaFilter}
+                        onChange={(e) => setSelectedUstaFilter(e.target.value)}
+                        className="bg-slate-800 text-white text-xs p-2 rounded-lg border border-slate-700 outline-none"
+                    >
+                        <option value="ALL">Tüm Personel</option>
+                        {ustaList.map(u => (
+                            <option key={u.name} value={u.name}>{u.name}</option>
+                        ))}
+                    </select>
                 )}
-            </div>
-          </div>
-
-          {/* Görev Sekmeleri */}
-          <div className="flex bg-slate-800/50 p-1 rounded-2xl mb-6 border border-slate-800">
-              <button 
+           </div>
+           
+           {/* Alt Sekmeler (Aktif / Geçmiş / Arşiv) */}
+           <div className="flex bg-slate-800/50 p-1 rounded-xl mb-4 border border-slate-700">
+               <button 
                   onClick={() => setActiveTaskTab('active')} 
-                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${activeTaskTab === 'active' ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
-              >
-                  Aktif
-              </button>
-              <button 
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTaskTab === 'active' ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-300'}`}
+               >
+                   Aktif
+               </button>
+               <button 
                   onClick={() => setActiveTaskTab('history')} 
-                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${activeTaskTab === 'history' ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
-              >
-                  Geçmiş
-              </button>
-              <button 
-                  onClick={() => setActiveTaskTab('deleted')} 
-                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${activeTaskTab === 'deleted' ? 'bg-red-900/20 text-red-400 shadow-md border border-red-900/30' : 'text-slate-500 hover:text-slate-300'}`}
-              >
-                  Silinenler
-              </button>
-          </div>
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTaskTab === 'history' ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-300'}`}
+               >
+                   Tamamlanan
+               </button>
+               {currentUser.role === 'AMIR' && (
+                   <button 
+                      onClick={() => setActiveTaskTab('deleted')} 
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTaskTab === 'deleted' ? 'bg-red-900/20 text-red-400 shadow' : 'text-slate-400 hover:text-red-400'}`}
+                   >
+                       Arşiv
+                   </button>
+               )}
+           </div>
 
-          {/* Usta Filtre Barı (Tasks) */}
-          {renderUstaFilter()}
-          
-          <div className="space-y-6">
-            {loading && activeTaskTab === 'deleted' && filteredTasks.length === 0 ? (
-                 <div className="flex flex-col items-center justify-center py-20 opacity-50 text-slate-600">
-                    <i className="fas fa-trash text-6xl mb-4"></i>
-                    <p className="font-bold">Silinen görev yok</p>
-                </div>
-            ) : filteredTasks.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 opacity-50 text-slate-600">
-                    <i className={`fas ${activeTaskTab === 'deleted' ? 'fa-trash' : 'fa-clipboard-list'} text-6xl mb-4`}></i>
-                    <p className="font-bold">
-                        {selectedUstaFilter !== 'ALL' ? `Bu ustaya ait ${activeTaskTab === 'active' ? 'aktif' : activeTaskTab === 'history' ? 'tamamlanmış' : 'silinmiş'} görev yok` : 
-                        (activeTaskTab === 'active' ? 'Aktif görev yok' : 
-                         activeTaskTab === 'history' ? 'Tamamlanan görev yok' : 'Silinen görev yok')}
-                    </p>
-                </div>
-            ) : (
-                filteredTasks.map(task => (
-                    <TaskCard 
-                        key={task.id} 
-                        task={task} 
-                        user={currentUser} 
-                        onUpdateStatus={updateTaskStatus}
-                        onDelete={activeTaskTab === 'deleted' ? handlePermanentDelete : handleDeleteTask}
-                        onMarkSeen={handleMarkTaskSeen}
-                        isArchived={activeTaskTab === 'deleted'}
-                    />
-                ))
-            )}
-          </div>
+           {/* GÖREV LİSTESİ RENDER MANTIĞI */}
+           {(() => {
+               // 1. Sekmeye Göre Ana Filtreleme (Aktif / Geçmiş / Arşiv)
+               let displayedTasks = [];
+               
+               if (activeTaskTab === 'active') {
+                   // Tamamlanmamış ve İptal edilmemişler
+                   displayedTasks = tasks.filter(t => t.status === TaskStatus.PENDING || t.status === TaskStatus.IN_PROGRESS);
+               } else if (activeTaskTab === 'history') {
+                   // Tamamlanmış veya İptal edilmişler
+                   displayedTasks = tasks.filter(t => t.status === TaskStatus.COMPLETED || t.status === TaskStatus.CANCELLED);
+               } else if (activeTaskTab === 'deleted') {
+                   // Arşivlenmişler
+                   displayedTasks = archivedTasks;
+               }
+
+               // 2. Kullanıcı Rolüne Göre Filtreleme
+               if (currentUser.role === 'USTA') {
+                   // Ustalar sadece kendilerine ait görevleri görür
+                   displayedTasks = displayedTasks.filter(t => t.masterName === currentUser.name);
+               } else if (currentUser.role === 'AMIR' && selectedUstaFilter !== 'ALL') {
+                   // Amirler seçili ustaya göre filtreler
+                   displayedTasks = displayedTasks.filter(t => t.masterName === selectedUstaFilter);
+               }
+
+               // 3. Sıralama (Yeniden eskiye)
+               if (activeTaskTab === 'deleted') {
+                   displayedTasks.sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
+               } else {
+                   displayedTasks.sort((a, b) => b.createdAt - a.createdAt);
+               }
+
+               if (displayedTasks.length === 0) {
+                   return (
+                       <div className="text-center py-20 opacity-50">
+                           <i className="fas fa-clipboard-check text-4xl mb-3 text-slate-600"></i>
+                           <p className="text-slate-400 font-bold">Bu alanda görev bulunamadı.</p>
+                       </div>
+                   );
+               }
+
+               return displayedTasks.map(task => (
+                   <TaskCard 
+                      key={task.id} 
+                      task={task} 
+                      user={currentUser} 
+                      onUpdateStatus={updateTaskStatus} 
+                      onDelete={activeTaskTab === 'deleted' ? handlePermanentDelete : handleDeleteTask}
+                      onMarkSeen={handleMarkTaskSeen}
+                      isArchived={activeTaskTab === 'deleted'}
+                   />
+               ));
+           })()}
         </div>
       )}
 
+      {/* 2. SEKME: TAKVİM */}
       {activeTab === 'calendar' && (
           <CalendarView 
-             leaves={leaves} 
-             user={currentUser} 
+             leaves={leaves}
+             user={currentUser}
              onAddLeave={handleAddLeave}
              onDeleteLeave={handleDeleteLeave}
              onUpdateStatus={handleLeaveStatus}
           />
       )}
 
-      {/* ... (Diğer tab içerikleri add, requests, profile aynı kalacak) ... */}
+      {/* 3. SEKME: GÖREV EKLE (Sadece AMİR) */}
       {activeTab === 'add' && currentUser.role === 'AMIR' && (
-        <div className="animate-in slide-in-from-bottom-4 duration-500 pb-24">
-            <h2 className="text-2xl font-black text-slate-100 mb-6 px-1">Yeni İş Emri</h2>
-            <form onSubmit={handleCreateTask} className="space-y-4">
-                {/* Form Inputs ... */}
-                <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-lg">
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Makine / Bölge</label>
+        <div className="max-w-md mx-auto animate-in zoom-in duration-300">
+           <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-black text-slate-100">Yeni İş Emri</h2>
+           </div>
+          
+           <form onSubmit={handleCreateTask} className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-xl space-y-5 relative overflow-hidden">
+             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+             
+             <div>
+               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Makine Adı / Bölge</label>
+               <input 
+                 type="text" 
+                 required
+                 className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3.5 text-white placeholder-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                 placeholder="Örn: CNC-01 veya Kazan Dairesi"
+                 value={newTaskMachine}
+                 onChange={e => setNewTaskMachine(e.target.value)}
+               />
+             </div>
+
+             <div>
+               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Görevli Personel</label>
+               <div className="grid grid-cols-2 gap-2">
+                 {ustaList.map(usta => (
+                   <button
+                     key={usta.name}
+                     type="button"
+                     onClick={() => setNewTaskMaster(usta.name)}
+                     className={`p-3 rounded-xl border text-sm font-bold flex items-center gap-2 transition-all ${
+                       newTaskMaster === usta.name 
+                       ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/50' 
+                       : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500'
+                     }`}
+                   >
+                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] ${newTaskMaster === usta.name ? 'bg-white text-blue-600' : 'bg-slate-700'}`}>
+                         {usta.name.substring(0,1)}
+                     </div>
+                     {usta.name}
+                   </button>
+                 ))}
+                 {ustaList.length === 0 && <p className="text-xs text-red-400 col-span-2">Kayıtlı usta bulunamadı. Lütfen profil menüsünden ekleyin.</p>}
+               </div>
+             </div>
+
+             <div>
+               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Öncelik Seviyesi</label>
+               <div className="grid grid-cols-4 gap-2">
+                  {Object.values(TaskPriority).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setNewTaskPriority(p)}
+                        className={`py-2 rounded-lg text-[10px] font-black uppercase tracking-wide border transition-all ${
+                            newTaskPriority === p 
+                            ? 'bg-white text-slate-900 border-white shadow-lg' 
+                            : 'bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500'
+                        }`}
+                      >
+                          {p}
+                      </button>
+                  ))}
+               </div>
+             </div>
+
+             <div>
+               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">İş Açıklaması</label>
+               <textarea 
+                 required
+                 rows={3}
+                 className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white placeholder-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all resize-none"
+                 placeholder="Yapılacak işlemi detaylı açıklayınız..."
+                 value={newTaskDescription}
+                 onChange={e => setNewTaskDescription(e.target.value)}
+               ></textarea>
+             </div>
+
+             <div>
+                <label className="flex items-center gap-3 p-3 rounded-xl border border-dashed border-slate-600 hover:border-blue-500 hover:bg-blue-900/10 transition-colors cursor-pointer group">
+                    <div className="w-10 h-10 rounded-full bg-slate-700 group-hover:bg-blue-900/30 flex items-center justify-center text-slate-400 group-hover:text-blue-500 transition-colors">
+                        <i className="fas fa-camera"></i>
+                    </div>
+                    <div className="flex-1">
+                        <span className="block text-xs font-bold text-slate-300 group-hover:text-blue-400">Fotoğraf Ekle (Opsiyonel)</span>
+                        <span className="block text-[10px] text-slate-500">Arıza veya makine görseli</span>
+                    </div>
                     <input 
-                        type="text" 
-                        required
-                        className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none transition-colors"
-                        placeholder="Örn: Pres 3"
-                        value={newTaskMachine}
-                        onChange={e => setNewTaskMachine(e.target.value)}
+                        type="file" 
+                        ref={fileInputRef}
+                        accept="image/*" 
+                        onChange={handleImageChange} 
+                        className="hidden" 
                     />
-                </div>
-
-                <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-lg">
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Arıza / İş Tanımı</label>
-                    <textarea 
-                        required
-                        rows={3}
-                        className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none transition-colors resize-none"
-                        placeholder="Yapılacak işlemi detaylandırın..."
-                        value={newTaskDescription}
-                        onChange={e => setNewTaskDescription(e.target.value)}
-                    ></textarea>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-lg">
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Görevli Usta</label>
-                        <select 
-                            required
-                            className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none transition-colors appearance-none"
-                            value={newTaskMaster}
-                            onChange={e => setNewTaskMaster(e.target.value)}
-                        >
-                            <option value="">Seçiniz</option>
-                            {ustaList.map(u => (
-                                <option key={u.name} value={u.name}>{u.name}</option>
-                            ))}
-                        </select>
+                </label>
+                {newTaskImage && (
+                    <div className="mt-3 relative w-full h-32 rounded-xl overflow-hidden shadow-md border border-slate-600">
+                        <img src={newTaskImage} alt="Önizleme" className="w-full h-full object-cover" />
+                        <button type="button" onClick={() => { setNewTaskImage(null); if(fileInputRef.current) fileInputRef.current.value = ''; }} className="absolute top-2 right-2 bg-black/50 hover:bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm transition-colors">
+                            <i className="fas fa-times"></i>
+                        </button>
                     </div>
+                )}
+             </div>
 
-                    <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-lg">
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Öncelik</label>
-                        <select 
-                            required
-                            className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:border-blue-500 outline-none transition-colors appearance-none"
-                            value={newTaskPriority}
-                            onChange={e => setNewTaskPriority(e.target.value as TaskPriority)}
-                        >
-                            {Object.values(TaskPriority).map(p => (
-                                <option key={p} value={p}>{p}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-
-                <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-lg">
-                    <label className="flex items-center gap-3 cursor-pointer group">
-                        <div className="w-12 h-12 rounded-xl bg-slate-700 flex items-center justify-center text-slate-400 group-hover:text-white group-hover:bg-blue-600 transition-colors">
-                            <i className="fas fa-camera"></i>
-                        </div>
-                        <div className="flex-1">
-                            <span className="block text-sm font-bold text-slate-300 group-hover:text-blue-400 transition-colors">Fotoğraf Ekle</span>
-                            <span className="block text-xs text-slate-500">Opsiyonel arıza görseli</span>
-                        </div>
-                        <input 
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            ref={fileInputRef}
-                            onChange={handleImageChange}
-                        />
-                    </label>
-                    {newTaskImage && (
-                        <div className="mt-4 relative rounded-xl overflow-hidden border border-slate-600 h-40">
-                            <img src={newTaskImage} alt="Preview" className="w-full h-full object-cover" />
-                            <button type="button" onClick={() => { setNewTaskImage(null); if(fileInputRef.current) fileInputRef.current.value=''; }} className="absolute top-2 right-2 bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg">
-                                <i className="fas fa-times"></i>
-                            </button>
-                        </div>
-                    )}
-                </div>
-
-                <button type="submit" className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black rounded-2xl shadow-lg shadow-blue-900/40 hover:shadow-blue-900/60 active:scale-95 transition-all text-lg">
-                    GÖREVİ YAYINLA
-                </button>
-            </form>
+             <button 
+               type="submit" 
+               disabled={loading}
+               className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-900/50 transform active:scale-95 transition-all flex items-center justify-center gap-2"
+             >
+               {loading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-paper-plane"></i>}
+               GÖREVİ YAYINLA
+             </button>
+           </form>
         </div>
       )}
 
+      {/* 4. SEKME: TALEPLER */}
       {activeTab === 'requests' && (
-         <div className="animate-in fade-in duration-500 pb-24">
-            <h2 className="text-2xl font-black text-slate-100 mb-6 px-1">Malzeme & İzin Talepleri</h2>
-            
-            {/* Usta Filtre Barı (Requests) */}
-            {renderUstaFilter()}
-
-            {currentUser.role === 'USTA' && (
-                <form onSubmit={handleCreateRequest} className="mb-8 bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-lg">
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Yeni Talep Oluştur</label>
-                    <div className="flex gap-2">
-                        <input 
+          <div className="space-y-4 pb-20">
+              <h2 className="text-2xl font-black text-slate-100 flex items-center gap-2 mb-4">
+                <i className="fas fa-envelope-open-text text-orange-500"></i>
+                Malzeme & Talep
+              </h2>
+              
+              {/* Talep Oluşturma (Sadece USTA) */}
+              {currentUser.role === 'USTA' && (
+                  <form onSubmit={handleCreateRequest} className="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-6">
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Yeni Talep Oluştur</label>
+                      <div className="flex gap-2">
+                          <input 
                             type="text" 
-                            required
-                            className="flex-1 bg-slate-900 border border-slate-600 rounded-xl p-3 text-white focus:border-orange-500 outline-none transition-colors"
-                            placeholder="İhtiyaç duyulan malzeme veya izin..."
+                            className="flex-1 bg-slate-900 border border-slate-600 rounded-xl p-3 text-white text-sm outline-none focus:border-orange-500"
+                            placeholder="Malzeme ihtiyacı veya talep..."
                             value={newRequestContent}
                             onChange={e => setNewRequestContent(e.target.value)}
-                        />
-                        <button type="submit" className="bg-orange-600 text-white px-4 rounded-xl font-bold shadow-lg shadow-orange-900/30 active:scale-95 transition-all">
-                            <i className="fas fa-paper-plane"></i>
-                        </button>
-                    </div>
-                </form>
-            )}
+                          />
+                          <button type="submit" className="bg-orange-600 hover:bg-orange-700 text-white px-4 rounded-xl shadow-lg shadow-orange-900/30">
+                              <i className="fas fa-paper-plane"></i>
+                          </button>
+                      </div>
+                  </form>
+              )}
 
-            <div className="space-y-3">
-                {filteredRequests.length === 0 ? (
-                    <div className="text-center py-10 opacity-50 text-slate-600">
-                        <p className="font-bold">Talep bulunmuyor</p>
-                    </div>
-                ) : (
-                    filteredRequests.map(req => (
-                        <div key={req.id} className="bg-slate-800 p-4 rounded-2xl border border-slate-700 relative overflow-hidden">
-                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-                                req.status === RequestStatus.APPROVED ? 'bg-emerald-500' :
-                                req.status === RequestStatus.REJECTED ? 'bg-red-500' : 'bg-orange-500'
-                            }`}></div>
-                            <div className="pl-3">
-                                <div className="flex justify-between items-start mb-2">
-                                    <div>
-                                        <p className="text-xs font-bold text-slate-500">{req.ustaName}</p>
-                                        <p className="text-slate-200 font-medium">{req.content}</p>
-                                    </div>
-                                    <span className={`text-[10px] font-bold px-2 py-1 rounded-md ${
-                                        req.status === RequestStatus.APPROVED ? 'bg-emerald-900/30 text-emerald-400' :
-                                        req.status === RequestStatus.REJECTED ? 'bg-red-900/30 text-red-400' : 'bg-orange-900/30 text-orange-400'
-                                    }`}>
-                                        {req.status === RequestStatus.APPROVED ? 'ONAYLANDI' :
-                                         req.status === RequestStatus.REJECTED ? 'REDDEDİLDİ' : 'BEKLİYOR'}
-                                    </span>
-                                </div>
-                                <div className="text-[10px] text-slate-600 text-right">
-                                    {new Date(req.createdAt).toLocaleDateString('tr-TR')}
-                                </div>
-                                
-                                {currentUser.role === 'AMIR' && (
-                                    <div className="mt-3 pt-3 border-t border-slate-700 flex justify-end gap-2">
-                                        <button onClick={() => handleDeleteRequest(req.id)} className="w-8 h-8 rounded-lg bg-slate-700 text-slate-400 hover:text-red-400 flex items-center justify-center">
-                                            <i className="fas fa-trash"></i>
-                                        </button>
-                                        {req.status === RequestStatus.PENDING && (
-                                            <>
-                                                <button onClick={() => handleRequestStatus(req.id, RequestStatus.REJECTED)} className="px-3 py-1.5 rounded-lg bg-red-900/20 text-red-400 text-xs font-bold hover:bg-red-900/40">REDDET</button>
-                                                <button onClick={() => handleRequestStatus(req.id, RequestStatus.APPROVED)} className="px-3 py-1.5 rounded-lg bg-emerald-900/20 text-emerald-400 text-xs font-bold hover:bg-emerald-900/40">ONAYLA</button>
-                                            </>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    ))
-                )}
-            </div>
-         </div>
+              {/* Talep Listesi */}
+              <div className="space-y-3">
+                  {requests.length === 0 && (
+                      <div className="text-center py-10 opacity-50">
+                          <i className="fas fa-inbox text-4xl mb-3 text-slate-600"></i>
+                          <p className="text-slate-400 font-bold">Henüz talep yok.</p>
+                      </div>
+                  )}
+                  
+                  {requests.map(req => (
+                      <div key={req.id} className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm relative overflow-hidden">
+                          <div className={`absolute left-0 top-0 bottom-0 w-1 ${
+                              req.status === RequestStatus.PENDING ? 'bg-amber-500' : 
+                              req.status === RequestStatus.APPROVED ? 'bg-emerald-500' : 'bg-red-500'
+                          }`}></div>
+                          
+                          <div className="flex justify-between items-start pl-3">
+                              <div>
+                                  <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-xs font-bold text-slate-300 bg-slate-700 px-2 py-0.5 rounded-md">{req.ustaName}</span>
+                                      <span className="text-[10px] text-slate-500">{new Date(req.createdAt).toLocaleDateString('tr-TR')}</span>
+                                  </div>
+                                  <p className="text-slate-200 text-sm">{req.content}</p>
+                                  
+                                  <div className="mt-2">
+                                      {req.status === RequestStatus.PENDING && <span className="text-[10px] font-bold text-amber-500 flex items-center gap-1"><i className="fas fa-clock"></i> Bekliyor</span>}
+                                      {req.status === RequestStatus.APPROVED && <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1"><i className="fas fa-check-circle"></i> Onaylandı</span>}
+                                      {req.status === RequestStatus.REJECTED && <span className="text-[10px] font-bold text-red-500 flex items-center gap-1"><i className="fas fa-times-circle"></i> Reddedildi</span>}
+                                  </div>
+                              </div>
+
+                              {/* Yönetici Aksiyonları */}
+                              {currentUser.role === 'AMIR' && (
+                                  <div className="flex flex-col gap-2">
+                                      {req.status === RequestStatus.PENDING && (
+                                          <>
+                                            <button onClick={() => handleRequestStatus(req.id, RequestStatus.APPROVED)} className="w-8 h-8 rounded-lg bg-emerald-900/20 text-emerald-400 hover:bg-emerald-900/40 flex items-center justify-center border border-emerald-900/30">
+                                                <i className="fas fa-check"></i>
+                                            </button>
+                                            <button onClick={() => handleRequestStatus(req.id, RequestStatus.REJECTED)} className="w-8 h-8 rounded-lg bg-red-900/20 text-red-400 hover:bg-red-900/40 flex items-center justify-center border border-red-900/30">
+                                                <i className="fas fa-times"></i>
+                                            </button>
+                                          </>
+                                      )}
+                                      <button onClick={() => handleDeleteRequest(req.id)} className="w-8 h-8 rounded-lg bg-slate-700 text-slate-400 hover:text-red-400 hover:bg-slate-600 flex items-center justify-center">
+                                          <i className="fas fa-trash-alt text-xs"></i>
+                                      </button>
+                                  </div>
+                              )}
+                              
+                              {/* Usta Kendi Talebini Silme (Sadece Beklemedeyse) */}
+                              {currentUser.role === 'USTA' && req.status === RequestStatus.PENDING && req.ustaName === currentUser.name && (
+                                   <button onClick={() => handleDeleteRequest(req.id)} className="w-8 h-8 rounded-lg bg-slate-700 text-slate-400 hover:text-red-400 hover:bg-slate-600 flex items-center justify-center">
+                                      <i className="fas fa-trash-alt text-xs"></i>
+                                  </button>
+                              )}
+                          </div>
+                      </div>
+                  ))}
+              </div>
+          </div>
       )}
 
+      {/* 5. SEKME: PROFİL VE AYARLAR */}
       {activeTab === 'profile' && (
-        <div className="animate-in fade-in duration-500 pb-24 space-y-6">
-            <h2 className="text-2xl font-black text-slate-100 px-1">Profil & Ayarlar</h2>
+        <div className="space-y-6 pb-20 animate-in fade-in duration-300">
+           <h2 className="text-2xl font-black text-slate-100 mb-4">Profil & Ayarlar</h2>
 
-            {/* Bağlantı Yönetimi - Sadece AMİR */}
-            {currentUser.role === 'AMIR' && (
-                <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-                    <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                        <i className="fas fa-network-wired text-blue-500"></i>
-                        Veri Bağlantısı
-                    </h3>
+           {/* Kullanıcı Kartı */}
+           <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-3xl border border-slate-700 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <i className="fas fa-user-circle text-9xl text-white"></i>
+                </div>
+                <div className="relative z-10">
+                    <div className="flex items-center gap-4 mb-4">
+                        <div className="w-16 h-16 rounded-2xl bg-slate-700 flex items-center justify-center text-2xl font-bold text-slate-300 shadow-inner">
+                            {currentUser.name.substring(0,1)}
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-black text-white">{currentUser.name}</h3>
+                            <p className="text-sm font-bold text-slate-400 uppercase tracking-wide">{currentUser.role === 'AMIR' ? 'YÖNETİCİ' : 'TEKNİK PERSONEL'}</p>
+                        </div>
+                    </div>
                     
-                    {connectionId ? (
-                        <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50 mb-4">
-                            <p className="text-xs text-slate-500 mb-1">Aktif Bağlantı ID</p>
-                            <div className="flex items-center gap-2">
-                                <code className="flex-1 bg-black/30 p-2 rounded text-emerald-400 font-mono text-sm">{connectionId}</code>
-                                <button onClick={() => navigator.clipboard.writeText(connectionId)} className="p-2 text-slate-400 hover:text-white">
-                                    <i className="fas fa-copy"></i>
-                                </button>
-                            </div>
-                            <p className="text-[10px] text-slate-500 mt-2">Bu kodu diğer cihazlara girerek verileri eşitleyebilirsiniz.</p>
-                        </div>
-                    ) : (
-                        <div className="flex gap-3 mb-4">
-                            <button onClick={handleCreateConnection} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold">Yeni Bağlantı Kur</button>
-                            <button onClick={handleJoinConnection} className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-xs font-bold">Koda Bağlan</button>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Personel Yönetimi - Sadece AMİR */}
-            {currentUser.role === 'AMIR' && (
-                <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-                    <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                        <i className="fas fa-users-cog text-purple-500"></i>
-                        Personel Listesi
-                    </h3>
-
-                    <div className="space-y-4 mb-6">
-                        <div>
-                            <p className="text-xs font-bold text-slate-500 mb-2 uppercase">Amirler</p>
-                            <div className="flex flex-wrap gap-2">
-                                {amirList.map(m => (
-                                    <div key={m.name} className="bg-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2 border border-slate-600">
-                                        <div className="relative">
-                                            <span className="text-xs text-slate-200 font-bold">{m.name}</span>
-                                            {isUserOnline(m.lastActive) && (
-                                                <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-slate-700"></span>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-1 ml-1">
-                                            <button onClick={() => setPasswordChangeModal({ show: true, memberName: m.name, role: 'AMIR' })} className="text-slate-400 hover:text-blue-400"><i className="fas fa-key text-[10px]"></i></button>
-                                            {isErkan && m.name !== 'Birim Amiri ERKAN ÇİLİNGİR' && (
-                                                <button onClick={() => handleRemoveMember(m.name, 'AMIR')} className="text-slate-400 hover:text-red-400"><i className="fas fa-times text-[10px]"></i></button>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <div>
-                            <p className="text-xs font-bold text-slate-500 mb-2 uppercase">Ustalar</p>
-                            <div className="flex flex-wrap gap-2">
-                                {ustaList.map(m => (
-                                    <div key={m.name} className="bg-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2 border border-slate-600">
-                                        <div className="relative">
-                                            <span className="text-xs text-slate-200 font-bold">{m.name}</span>
-                                            {isUserOnline(m.lastActive) && (
-                                                <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-slate-700"></span>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-1 ml-1">
-                                             {/* KONUM İKONU */}
-                                             {m.latitude && m.longitude && (
-                                                 <a 
-                                                    href={`https://www.google.com/maps?q=${m.latitude},${m.longitude}`} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer"
-                                                    className="text-slate-400 hover:text-red-500 mx-1"
-                                                    title="Konumu Gör"
-                                                 >
-                                                     <i className="fas fa-map-marker-alt text-[10px]"></i>
-                                                 </a>
-                                             )}
-                                             <button onClick={() => setPasswordChangeModal({ show: true, memberName: m.name, role: 'USTA' })} className="text-slate-400 hover:text-blue-400"><i className="fas fa-key text-[10px]"></i></button>
-                                             <button onClick={() => handleRemoveMember(m.name, 'USTA')} className="text-slate-400 hover:text-red-400"><i className="fas fa-times text-[10px]"></i></button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                    <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50 text-xs text-slate-400 font-mono mb-4 break-all">
+                        ID: {currentUser.id}
                     </div>
 
-                    <div className="pt-4 border-t border-slate-700">
-                        <p className="text-xs font-bold text-slate-400 mb-3">Yeni Personel Ekle</p>
-                        <div className="grid grid-cols-2 gap-2 mb-2">
+                    <button 
+                        onClick={toggleWakeLock} 
+                        className={`w-full py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${wakeLock ? 'bg-yellow-600 text-white shadow-lg shadow-yellow-900/40' : 'bg-slate-700 text-slate-300'}`}
+                    >
+                        <i className={`fas ${wakeLock ? 'fa-sun fa-spin' : 'fa-moon'}`}></i>
+                        {wakeLock ? 'EKRAN AÇIK TUTULUYOR' : 'EKRANI AÇIK TUT'}
+                    </button>
+                </div>
+           </div>
+
+           {/* Sistem Durumu (Amir) */}
+           {currentUser.role === 'AMIR' && (
+               <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                    <h4 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                        <i className="fas fa-server text-blue-500"></i> Sistem Durumu
+                    </h4>
+                    
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-center text-xs">
+                             <span className="text-slate-400">Veri Tabanı:</span>
+                             <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                 Npoint.io (Aktif)
+                             </span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                             <span className="text-slate-400">Son Senkronizasyon:</span>
+                             <span className="text-slate-300 font-mono">{msSinceSync}ms önce</span>
+                        </div>
+                        <div className="bg-slate-900 p-2 rounded text-[10px] text-slate-500 font-mono break-all border border-slate-700">
+                             BIN ID: {connectionId || 'Bağlı Değil'}
+                        </div>
+                        <div className="pt-2 flex gap-2">
+                             <button onClick={() => loadData()} className="flex-1 bg-blue-600/20 text-blue-400 py-2 rounded-lg text-xs font-bold hover:bg-blue-600/40 transition-colors">
+                                 <i className="fas fa-sync-alt mr-1"></i> Zorla Yenile
+                             </button>
+                             <button onClick={requestNotificationPermission} className="flex-1 bg-purple-600/20 text-purple-400 py-2 rounded-lg text-xs font-bold hover:bg-purple-600/40 transition-colors">
+                                 <i className="fas fa-bell mr-1"></i> Bildirim İzni
+                             </button>
+                        </div>
+                    </div>
+               </div>
+           )}
+
+           {/* Personel Yönetimi (SADECE AMİR) */}
+           {currentUser.role === 'AMIR' && (
+               <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                    <h4 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                        <i className="fas fa-users-cog text-blue-500"></i> Personel Yönetimi
+                    </h4>
+                    
+                    <div className="space-y-2 mb-4">
+                        {/* Amir Listesi */}
+                        <div className="text-[10px] font-bold text-slate-500 uppercase mt-2">Yöneticiler</div>
+                        {amirList.map(member => (
+                            <div key={member.name} className="flex justify-between items-center bg-slate-900/50 p-2 rounded-lg border border-slate-700/50">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                    <span className="text-xs font-bold text-slate-300">{member.name}</span>
+                                    {member.password && <i className="fas fa-lock text-[10px] text-slate-500" title="Şifreli"></i>}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button onClick={() => setPasswordChangeModal({show: true, memberName: member.name, role: 'AMIR'})} className="text-slate-500 hover:text-blue-400 transition-colors">
+                                        <i className="fas fa-key text-xs"></i>
+                                    </button>
+                                    <button onClick={() => handleRemoveMember(member.name, 'AMIR')} className="text-slate-500 hover:text-red-400 transition-colors">
+                                        <i className="fas fa-trash-alt text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+
+                        {/* Usta Listesi */}
+                        <div className="text-[10px] font-bold text-slate-500 uppercase mt-2">Teknik Personel</div>
+                        {ustaList.map(member => (
+                            <div key={member.name} className="flex justify-between items-center bg-slate-900/50 p-2 rounded-lg border border-slate-700/50">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                    <div>
+                                        <span className="text-xs font-bold text-slate-300 block">{member.name}</span>
+                                        {member.phoneNumber && <span className="text-[9px] text-slate-500 block"><i className="fab fa-whatsapp"></i> {member.phoneNumber}</span>}
+                                    </div>
+                                    {member.password && <i className="fas fa-lock text-[10px] text-slate-500" title="Şifreli"></i>}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button onClick={() => setPasswordChangeModal({show: true, memberName: member.name, role: 'USTA'})} className="text-slate-500 hover:text-blue-400 transition-colors">
+                                        <i className="fas fa-key text-xs"></i>
+                                    </button>
+                                    <button onClick={() => handleRemoveMember(member.name, 'USTA')} className="text-slate-500 hover:text-red-400 transition-colors">
+                                        <i className="fas fa-trash-alt text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase mb-2">Yeni Personel Ekle</p>
+                        <div className="space-y-2">
                             <input 
+                                type="text" 
                                 placeholder="İsim Soyisim" 
-                                className="bg-slate-900 border border-slate-600 rounded-lg p-2 text-xs text-white"
+                                className="w-full bg-slate-800 border border-slate-600 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500"
                                 value={newMemberName}
-                                onChange={e => setNewMemberName(e.target.value)}
+                                onChange={(e) => setNewMemberName(e.target.value)}
                             />
-                            <select 
-                                className="bg-slate-900 border border-slate-600 rounded-lg p-2 text-xs text-white"
-                                value={newMemberRole}
-                                onChange={e => setNewMemberRole(e.target.value as any)}
-                            >
-                                <option value="USTA">Usta</option>
-                                <option value="AMIR">Amir</option>
-                            </select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 mb-2">
+                            <div className="flex gap-2">
+                                <input 
+                                    type="password" 
+                                    placeholder="Şifre (Opsiyonel)" 
+                                    className="flex-1 bg-slate-800 border border-slate-600 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500"
+                                    value={newMemberPassword}
+                                    onChange={(e) => setNewMemberPassword(e.target.value)}
+                                />
+                                <select 
+                                    className="bg-slate-800 border border-slate-600 rounded-lg p-2 text-xs text-white outline-none"
+                                    value={newMemberRole}
+                                    onChange={(e) => setNewMemberRole(e.target.value as any)}
+                                >
+                                    <option value="USTA">Usta</option>
+                                    <option value="AMIR">Amir</option>
+                                </select>
+                            </div>
                              <input 
-                                type="tel"
-                                placeholder="5XX... (Whatsapp)" 
-                                className="bg-slate-900 border border-slate-600 rounded-lg p-2 text-xs text-white"
+                                type="tel" 
+                                placeholder="Telefon (5XX...) - Whatsapp için" 
+                                className="w-full bg-slate-800 border border-slate-600 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500"
                                 value={newMemberPhone}
-                                onChange={e => setNewMemberPhone(e.target.value)}
+                                onChange={(e) => setNewMemberPhone(e.target.value)}
                             />
-                            <input 
-                                placeholder="Şifre (Opsiyonel)" 
-                                className="bg-slate-900 border border-slate-600 rounded-lg p-2 text-xs text-white"
-                                value={newMemberPassword}
-                                onChange={e => setNewMemberPassword(e.target.value)}
-                            />
+                            <button 
+                                onClick={handleAddMember}
+                                disabled={!newMemberName}
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 text-xs font-bold transition-colors disabled:opacity-50"
+                            >
+                                <i className="fas fa-plus mr-1"></i> Ekle
+                            </button>
                         </div>
-                        <button onClick={handleAddMember} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-2 text-xs font-bold shadow-lg shadow-emerald-900/20">
-                            Ekle
-                        </button>
                     </div>
-                </div>
-            )}
-            
-            <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-                <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                    <i className="fas fa-mobile-alt text-teal-500"></i>
-                    Uygulama Ayarları
-                </h3>
-                <div className="flex gap-3">
-                    <button onClick={toggleWakeLock} className={`flex-1 py-3 rounded-xl text-xs font-bold border transition-colors ${wakeLock ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-500' : 'bg-slate-700 border-slate-600 text-slate-400'}`}>
-                        {wakeLock ? 'Ekran Açık Kalıyor' : 'Ekranı Açık Tut'}
-                    </button>
-                    <button onClick={requestNotificationPermission} className="flex-1 py-3 bg-slate-700 border border-slate-600 text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-600">
-                        Bildirim İzni
-                    </button>
-                </div>
-            </div>
-
-            <div className="text-center pt-8 opacity-40">
-                <i className="fas fa-oil-can text-4xl mb-2 text-slate-500"></i>
-                <p className="text-[10px] font-mono text-slate-500">Hidrolik Takip v1.4</p>
-            </div>
+               </div>
+           )}
         </div>
       )}
 
-      {/* Şifre Değiştirme Modal */}
+      {/* Şifre Değiştirme Modalı */}
       {passwordChangeModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-            <div className="bg-slate-800 p-6 rounded-2xl w-full max-w-xs border border-slate-700">
-                <h3 className="text-white font-bold mb-4">Şifre Değiştir: {passwordChangeModal.memberName}</h3>
-                <form onSubmit={handleChangePassword}>
-                    <input 
-                        className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white mb-4 outline-none focus:border-blue-500"
-                        placeholder="Yeni Şifre"
-                        value={newPasswordInput}
-                        onChange={e => setNewPasswordInput(e.target.value)}
-                        autoFocus
-                    />
-                    <div className="flex gap-3">
-                        <button type="button" onClick={() => setPasswordChangeModal(null)} className="flex-1 py-2 bg-slate-700 text-slate-300 rounded-lg text-sm font-bold">İptal</button>
-                        <button type="submit" className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold">Kaydet</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
+              <div className="bg-slate-800 rounded-2xl w-full max-w-xs border border-slate-700 shadow-2xl p-5">
+                  <h3 className="text-sm font-black text-slate-100 mb-1">Şifre Değiştir</h3>
+                  <p className="text-xs text-slate-400 mb-4">{passwordChangeModal.memberName} için yeni şifre belirleyin.</p>
+                  
+                  <form onSubmit={handleChangePassword}>
+                      <input 
+                          type="text" 
+                          autoFocus
+                          placeholder="Yeni Şifre (Boş = Şifresiz)"
+                          className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white text-sm mb-4 outline-none focus:border-blue-500"
+                          value={newPasswordInput}
+                          onChange={(e) => setNewPasswordInput(e.target.value)}
+                      />
+                      <div className="flex gap-2">
+                          <button type="button" onClick={() => { setPasswordChangeModal(null); setNewPasswordInput(''); }} className="flex-1 py-2 bg-slate-700 text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-600">
+                              İptal
+                          </button>
+                          <button type="submit" className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700">
+                              Kaydet
+                          </button>
+                      </div>
+                  </form>
+              </div>
+          </div>
       )}
     </Layout>
   );
