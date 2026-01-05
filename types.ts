@@ -60,6 +60,7 @@ export interface User {
   id: string;
   name: string;
   role: 'AMIR' | 'USTA';
+  avatar?: string;
 }
 
 export interface Member {
@@ -69,6 +70,7 @@ export interface Member {
   lastActive?: number; // Online durumu için son aktif zamanı
   latitude?: number; // YENİ: Enlem
   longitude?: number; // YENİ: Boylam
+  avatar?: string;
 }
 
 export interface AppState {

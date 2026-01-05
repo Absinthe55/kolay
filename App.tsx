@@ -460,7 +460,7 @@ const App: React.FC = () => {
           setLoginError(false);
           setLoginRememberMe(false);
       } else {
-          performLogin(member.name, role, false);
+          performLogin(member.name, role, false, member.avatar);
       }
   };
 
@@ -469,7 +469,7 @@ const App: React.FC = () => {
       if (!loginModal || !loginModal.member) return;
 
       if (loginPasswordInput === loginModal.member.password) {
-          performLogin(loginModal.member.name, loginModal.role, loginRememberMe);
+          performLogin(loginModal.member.name, loginModal.role, loginRememberMe, loginModal.member.avatar);
           setLoginModal(null);
       } else {
           setLoginError(true);
@@ -477,11 +477,12 @@ const App: React.FC = () => {
       }
   };
 
-  const performLogin = (name: string, role: 'AMIR' | 'USTA', remember: boolean) => {
+  const performLogin = (name: string, role: 'AMIR' | 'USTA', remember: boolean, avatar?: string) => {
     const user: User = {
       id: Math.random().toString(36).substr(2, 9),
       name: name,
-      role
+      role,
+      avatar
     };
     setCurrentUser(user);
     setActiveTab('tasks'); // Giriş yapınca her zaman Görevler ekranına at
@@ -710,6 +711,56 @@ const App: React.FC = () => {
     setRenameModal(null);
     setRenameInput('');
     alert("Kullanıcı adı başarıyla güncellendi.");
+  };
+
+  const handleProfileAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !currentUser) return;
+
+      setLoading(true);
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const img = new Image();
+        img.onload = async () => {
+          // Resmi yeniden boyutlandır (Maks 300x300 - profil için yeterli)
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const maxWidth = 300;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          ctx?.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6); // Biraz daha düşük kalite yeterli
+
+          // State'leri güncelle
+          let newAmirs = [...amirList];
+          let newUstas = [...ustaList];
+          
+          if (currentUser.role === 'AMIR') {
+              newAmirs = newAmirs.map(m => m.name === currentUser.name ? { ...m, avatar: compressedBase64 } : m);
+              setAmirList(newAmirs);
+          } else {
+              newUstas = newUstas.map(m => m.name === currentUser.name ? { ...m, avatar: compressedBase64 } : m);
+              setUstaList(newUstas);
+          }
+
+          const updatedUser = { ...currentUser, avatar: compressedBase64 };
+          setCurrentUser(updatedUser);
+          localStorage.setItem(LOCAL_KEY_AUTH, JSON.stringify(updatedUser));
+
+          await saveAppData({ tasks, requests, leaves, amirs: newAmirs, ustas: newUstas, deletedTasks: archivedTasks }, connectionId);
+          setLoading(false);
+        };
+        img.src = event.target?.result as string;
+      };
+      reader.readAsDataURL(file);
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1023,7 +1074,11 @@ const App: React.FC = () => {
                     <div className="absolute inset-0 bg-blue-400/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
                     <div className="text-slate-200 group-hover:text-white relative z-10 flex items-center gap-3">
                         <div className="relative flex-shrink-0">
-                            <i className="fas fa-user-tie text-blue-400 group-hover:text-white/80"></i>
+                            {member.avatar ? (
+                                <img src={member.avatar} className="w-6 h-6 rounded-full object-cover border border-slate-600" />
+                            ) : (
+                                <i className="fas fa-user-tie text-blue-400 group-hover:text-white/80"></i>
+                            )}
                             {isUserOnline(member.lastActive) && (
                                 <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-green-500 border-2 border-slate-800 rounded-full"></span>
                             )}
@@ -1060,7 +1115,11 @@ const App: React.FC = () => {
                     <div className="absolute inset-0 bg-emerald-400/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
                     <div className="text-slate-200 group-hover:text-white relative z-10 flex items-center gap-3">
                         <div className="relative flex-shrink-0">
-                            <i className="fas fa-wrench text-emerald-400 group-hover:text-white/80"></i>
+                            {member.avatar ? (
+                                <img src={member.avatar} className="w-6 h-6 rounded-full object-cover border border-slate-600" />
+                            ) : (
+                                <i className="fas fa-wrench text-emerald-400 group-hover:text-white/80"></i>
+                            )}
                             {isUserOnline(member.lastActive) && (
                                 <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-green-500 border-2 border-slate-800 rounded-full"></span>
                             )}
@@ -1104,8 +1163,12 @@ const App: React.FC = () => {
                 <div className="bg-slate-800 rounded-3xl p-6 w-full max-w-xs shadow-2xl scale-100 animate-in zoom-in-95 duration-200 relative overflow-hidden border border-slate-700">
                      <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
                     <div className="text-center mb-6">
-                        <div className="w-16 h-16 bg-blue-900/30 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner border border-blue-800/30">
-                            <i className="fas fa-lock text-2xl"></i>
+                        <div className="w-16 h-16 bg-blue-900/30 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner border border-blue-800/30 relative overflow-hidden">
+                            {loginModal.member?.avatar ? (
+                                <img src={loginModal.member.avatar} className="w-full h-full object-cover" />
+                            ) : (
+                                <i className="fas fa-lock text-2xl"></i>
+                            )}
                         </div>
                         <h3 className="text-lg font-black text-slate-100">Şifre Giriniz</h3>
                         <p className="text-sm text-slate-400 font-medium">{loginModal.member?.name}</p>
@@ -1303,8 +1366,8 @@ const App: React.FC = () => {
                        : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500'
                      }`}
                    >
-                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] ${newTaskMaster === usta.name ? 'bg-white text-blue-600' : 'bg-slate-700'}`}>
-                         {usta.name.substring(0,1)}
+                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] ${newTaskMaster === usta.name ? 'bg-white text-blue-600' : 'bg-slate-700'} overflow-hidden`}>
+                         {usta.avatar ? <img src={usta.avatar} className="w-full h-full object-cover" /> : usta.name.substring(0,1)}
                      </div>
                      {usta.name}
                    </button>
@@ -1480,31 +1543,32 @@ const App: React.FC = () => {
            <h2 className="text-2xl font-black text-slate-100 mb-4">Profil & Ayarlar</h2>
 
            {/* Kullanıcı Kartı */}
-           <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-3xl border border-slate-700 shadow-xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                    <i className="fas fa-user-circle text-9xl text-white"></i>
+           <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-3xl border border-slate-700 shadow-xl relative overflow-hidden flex items-center gap-5">
+                {/* Profil Fotoğrafı */}
+                <div className="relative group">
+                    <div className="w-20 h-20 rounded-full bg-slate-700 flex items-center justify-center border-4 border-slate-800 shadow-xl overflow-hidden">
+                        {currentUser.avatar ? (
+                            <img src={currentUser.avatar} className="w-full h-full object-cover" />
+                        ) : (
+                            <span className="text-3xl font-black text-slate-500">{currentUser.name[0]}</span>
+                        )}
+                    </div>
+                    <label className="absolute bottom-0 right-0 w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center cursor-pointer hover:bg-blue-500 text-white shadow-lg border-2 border-slate-800 transition-colors">
+                        <i className="fas fa-camera text-[10px]"></i>
+                        <input type="file" accept="image/*" className="hidden" onChange={handleProfileAvatarChange} />
+                    </label>
                 </div>
-                <div className="relative z-10">
-                    <div className="flex items-center gap-4 mb-4">
-                        <div className="w-16 h-16 rounded-2xl bg-slate-700 flex items-center justify-center text-2xl font-bold text-slate-300 shadow-inner">
-                            {currentUser.name.substring(0,1)}
-                        </div>
-                        <div>
-                            <h3 className="text-xl font-black text-white">{currentUser.name}</h3>
-                            <p className="text-sm font-bold text-slate-400 uppercase tracking-wide">{currentUser.role === 'AMIR' ? 'YÖNETİCİ' : 'TEKNİK PERSONEL'}</p>
-                        </div>
-                    </div>
-                    
-                    <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50 text-xs text-slate-400 font-mono mb-4 break-all">
-                        ID: {currentUser.id}
-                    </div>
 
+                <div className="relative z-10 flex-1">
+                    <h3 className="text-xl font-black text-white">{currentUser.name}</h3>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">{currentUser.role === 'AMIR' ? 'YÖNETİCİ' : 'TEKNİK PERSONEL'}</p>
+                    
                     <button 
                         onClick={toggleWakeLock} 
-                        className={`w-full py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${wakeLock ? 'bg-yellow-600 text-white shadow-lg shadow-yellow-900/40' : 'bg-slate-700 text-slate-300'}`}
+                        className={`py-2 px-3 rounded-lg font-bold text-[10px] flex items-center gap-2 transition-all w-fit ${wakeLock ? 'bg-yellow-600 text-white shadow-lg shadow-yellow-900/40' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
                     >
                         <i className={`fas ${wakeLock ? 'fa-sun fa-spin' : 'fa-moon'}`}></i>
-                        {wakeLock ? 'EKRAN AÇIK TUTULUYOR' : 'EKRANI AÇIK TUT'}
+                        {wakeLock ? 'EKRAN AÇIK' : 'EKRANI AÇIK TUT'}
                     </button>
                 </div>
            </div>
@@ -1543,23 +1607,26 @@ const App: React.FC = () => {
                </div>
            )}
 
-           {/* Personel Yönetimi (SADECE AMİR) */}
-           {currentUser.role === 'AMIR' && (
-               <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-                    <h4 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                        <i className="fas fa-users-cog text-blue-500"></i> Personel Yönetimi
-                    </h4>
-                    
-                    <div className="space-y-2 mb-4">
-                        {/* Amir Listesi */}
-                        <div className="text-[10px] font-bold text-slate-500 uppercase mt-2">Yöneticiler</div>
-                        {amirList.map(member => (
-                            <div key={member.name} className="flex justify-between items-center bg-slate-900/50 p-2 rounded-lg border border-slate-700/50">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                                    <span className="text-xs font-bold text-slate-300">{member.name}</span>
-                                    {member.password && <i className="fas fa-lock text-[10px] text-slate-500" title="Şifreli"></i>}
+           {/* Personel Yönetimi (HERKES GÖREBİLİR - AMA SADECE AMİR DÜZENLER) */}
+           <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                <h4 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                    <i className="fas fa-users-cog text-blue-500"></i> Personel Yönetimi
+                </h4>
+                
+                <div className="space-y-2 mb-4">
+                    {/* Amir Listesi */}
+                    <div className="text-[10px] font-bold text-slate-500 uppercase mt-2">Yöneticiler</div>
+                    {amirList.map(member => (
+                        <div key={member.name} className="flex justify-between items-center bg-slate-900/50 p-2 rounded-lg border border-slate-700/50">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-blue-900/30 flex items-center justify-center border border-blue-500/30 overflow-hidden">
+                                    {member.avatar ? <img src={member.avatar} className="w-full h-full object-cover" /> : <span className="text-xs font-bold text-blue-400">{member.name[0]}</span>}
                                 </div>
+                                <span className="text-xs font-bold text-slate-300">{member.name}</span>
+                            </div>
+                            
+                            {/* Sadece Amirler Butonları Görür */}
+                            {currentUser.role === 'AMIR' && (
                                 <div className="flex items-center gap-2">
                                     <button onClick={() => { setRenameModal({show: true, oldName: member.name, role: 'AMIR'}); setRenameInput(member.name); }} className="text-slate-500 hover:text-blue-400 transition-colors">
                                         <i className="fas fa-pen text-xs"></i>
@@ -1571,21 +1638,26 @@ const App: React.FC = () => {
                                         <i className="fas fa-trash-alt text-xs"></i>
                                     </button>
                                 </div>
-                            </div>
-                        ))}
+                            )}
+                        </div>
+                    ))}
 
-                        {/* Usta Listesi */}
-                        <div className="text-[10px] font-bold text-slate-500 uppercase mt-2">Teknik Personel</div>
-                        {ustaList.map(member => (
-                            <div key={member.name} className="flex justify-between items-center bg-slate-900/50 p-2 rounded-lg border border-slate-700/50">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                                    <div>
-                                        <span className="text-xs font-bold text-slate-300 block">{member.name}</span>
-                                        {member.phoneNumber && <span className="text-[9px] text-slate-500 block"><i className="fab fa-whatsapp"></i> {member.phoneNumber}</span>}
-                                    </div>
-                                    {member.password && <i className="fas fa-lock text-[10px] text-slate-500" title="Şifreli"></i>}
+                    {/* Usta Listesi */}
+                    <div className="text-[10px] font-bold text-slate-500 uppercase mt-2">Teknik Personel</div>
+                    {ustaList.map(member => (
+                        <div key={member.name} className="flex justify-between items-center bg-slate-900/50 p-2 rounded-lg border border-slate-700/50">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-emerald-900/30 flex items-center justify-center border border-emerald-500/30 overflow-hidden">
+                                     {member.avatar ? <img src={member.avatar} className="w-full h-full object-cover" /> : <span className="text-xs font-bold text-emerald-400">{member.name[0]}</span>}
                                 </div>
+                                <div>
+                                    <span className="text-xs font-bold text-slate-300 block">{member.name}</span>
+                                    {member.phoneNumber && <span className="text-[9px] text-slate-500 block"><i className="fab fa-whatsapp"></i> {member.phoneNumber}</span>}
+                                </div>
+                            </div>
+
+                             {/* Sadece Amirler Butonları Görür */}
+                            {currentUser.role === 'AMIR' && (
                                 <div className="flex items-center gap-2">
                                     <button onClick={() => { setRenameModal({show: true, oldName: member.name, role: 'USTA'}); setRenameInput(member.name); }} className="text-slate-500 hover:text-blue-400 transition-colors">
                                         <i className="fas fa-pen text-xs"></i>
@@ -1597,10 +1669,13 @@ const App: React.FC = () => {
                                         <i className="fas fa-trash-alt text-xs"></i>
                                     </button>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
 
+                {/* Yeni Ekleme Formu SADECE AMİR */}
+                {currentUser.role === 'AMIR' && (
                     <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
                         <p className="text-[10px] font-bold text-slate-500 uppercase mb-2">Yeni Personel Ekle</p>
                         <div className="space-y-2">
@@ -1644,8 +1719,8 @@ const App: React.FC = () => {
                             </button>
                         </div>
                     </div>
-               </div>
-           )}
+                )}
+           </div>
         </div>
       )}
 
