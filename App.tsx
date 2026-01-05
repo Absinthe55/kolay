@@ -1200,7 +1200,7 @@ const App: React.FC = () => {
                 </div>
             )}
           </div>
-          <p className="text-center text-[10px] text-slate-600 mt-6 font-mono">v1.0.3 &bull; Güvenli Bağlantı</p>
+          <p className="text-center text-[10px] text-slate-600 mt-6 font-mono">v1.0.4 &bull; Güvenli Bağlantı</p>
         </div>
 
         {/* Login Password Modal */}

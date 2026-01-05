@@ -1,3 +1,4 @@
+
 import { Task, Member, UstaRequest, LeaveRequest } from '../types';
 
 // NPOINT.IO AYARLARI
@@ -43,7 +44,11 @@ export const extractBinId = (input: string): string => {
 export const checkConnection = async (id: string): Promise<boolean> => {
     if (!id) return false;
     try {
-        const response = await fetch(`${API_BASE}/${id}`);
+        // Cache busting için rastgele parametre
+        const response = await fetch(`${API_BASE}/${id}?t=${Date.now()}`, {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        });
         return response.ok;
     } catch {
         return false;
@@ -121,7 +126,16 @@ export const fetchAppData = async (binId?: string): Promise<AppData> => {
   }
   
   try {
-    const response = await fetch(`${API_BASE}/${id}`);
+    // ÖNEMLİ: ?t=... parametresi ve no-store header'ı ile önbelleği zorla atlatıyoruz
+    const response = await fetch(`${API_BASE}/${id}?nocache=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        }
+    });
+
     if (response.ok) {
       const data = await response.json();
       
@@ -193,14 +207,23 @@ export const saveAppData = async (data: Omit<AppData, 'updatedAt'>, binId?: stri
   if (!id) return true;
 
   try {
+    // 1. Önce sunucuya veriyi gönder
     const response = await fetch(`${API_BASE}/${id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    return response.ok;
+
+    // 2. Npoint bazen dağıtımı geciktirebilir, 250ms bekleyelim
+    if (response.ok) {
+        await new Promise(resolve => setTimeout(resolve, 250));
+        return true;
+    }
+    return false;
   } catch (e) {
     console.error("Kayıt hatası:", e);
+    // Hata durumunda, kullanıcının interneti olmayabilir ama local'e kaydettik.
+    // Kullanıcıya hissettirmemek için false dönüyoruz ama veri localde güvende.
     return false;
   }
 };
