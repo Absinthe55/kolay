@@ -52,6 +52,10 @@ const App: React.FC = () => {
   const [passwordChangeModal, setPasswordChangeModal] = useState<{show: boolean, memberName: string, role: 'AMIR' | 'USTA'} | null>(null);
   const [newPasswordInput, setNewPasswordInput] = useState('');
 
+  // İsim Değiştirme Modal State
+  const [renameModal, setRenameModal] = useState<{show: boolean, oldName: string, role: 'AMIR' | 'USTA'} | null>(null);
+  const [renameInput, setRenameInput] = useState('');
+
   // Login State
   const [loginModal, setLoginModal] = useState<{show: boolean, member: Member | null, role: 'AMIR' | 'USTA'} | null>(null);
   const [loginPasswordInput, setLoginPasswordInput] = useState('');
@@ -639,6 +643,73 @@ const App: React.FC = () => {
     setPasswordChangeModal(null);
     setNewPasswordInput('');
     alert("Şifre güncellendi.");
+  };
+
+  const handleRenameMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!renameModal || !renameInput.trim()) return;
+
+    const oldName = renameModal.oldName;
+    const newName = renameInput.trim();
+    
+    // Boş veya aynı isimse çık
+    if (newName === oldName) {
+        setRenameModal(null);
+        return;
+    }
+
+    setLoading(true);
+    
+    // 1. Listeleri Güncelle
+    let newAmirs = [...amirList];
+    let newUstas = [...ustaList];
+
+    if (renameModal.role === 'AMIR') {
+        newAmirs = newAmirs.map(m => m.name === oldName ? { ...m, name: newName } : m);
+        setAmirList(newAmirs);
+    } else {
+        newUstas = newUstas.map(m => m.name === oldName ? { ...m, name: newName } : m);
+        setUstaList(newUstas);
+    }
+
+    // 2. Geçmiş Verileri Güncelle (Tutarlılık için önemli)
+    // Görevlerdeki masterName
+    const updatedTasks = tasks.map(t => t.masterName === oldName ? { ...t, masterName: newName } : t);
+    setTasks(updatedTasks);
+
+    // Arşivdeki masterName
+    const updatedArchived = archivedTasks.map(t => t.masterName === oldName ? { ...t, masterName: newName } : t);
+    setArchivedTasks(updatedArchived);
+
+    // Taleplerdeki ustaName
+    const updatedRequests = requests.map(r => r.ustaName === oldName ? { ...r, ustaName: newName } : r);
+    setRequests(updatedRequests);
+
+    // İzinlerdeki ustaName
+    const updatedLeaves = leaves.map(l => l.ustaName === oldName ? { ...l, ustaName: newName } : l);
+    setLeaves(updatedLeaves);
+
+    // Eğer kendimizi değiştirdiysek currentUser'ı güncelle
+    if (currentUser && currentUser.name === oldName) {
+        const updatedUser = { ...currentUser, name: newName };
+        setCurrentUser(updatedUser);
+        localStorage.setItem(LOCAL_KEY_AUTH, JSON.stringify(updatedUser));
+    }
+
+    // 3. Veritabanına Kaydet
+    await saveAppData({ 
+        tasks: updatedTasks, 
+        requests: updatedRequests, 
+        leaves: updatedLeaves, 
+        amirs: newAmirs, 
+        ustas: newUstas, 
+        deletedTasks: updatedArchived 
+    }, connectionId);
+
+    setLoading(false);
+    setRenameModal(null);
+    setRenameInput('');
+    alert("Kullanıcı adı başarıyla güncellendi.");
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1490,7 +1561,10 @@ const App: React.FC = () => {
                                     {member.password && <i className="fas fa-lock text-[10px] text-slate-500" title="Şifreli"></i>}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <button onClick={() => setPasswordChangeModal({show: true, memberName: member.name, role: 'AMIR'})} className="text-slate-500 hover:text-blue-400 transition-colors">
+                                    <button onClick={() => { setRenameModal({show: true, oldName: member.name, role: 'AMIR'}); setRenameInput(member.name); }} className="text-slate-500 hover:text-blue-400 transition-colors">
+                                        <i className="fas fa-pen text-xs"></i>
+                                    </button>
+                                    <button onClick={() => { setPasswordChangeModal({show: true, memberName: member.name, role: 'AMIR'}); setNewPasswordInput(member.password || ''); }} className="text-slate-500 hover:text-blue-400 transition-colors">
                                         <i className="fas fa-key text-xs"></i>
                                     </button>
                                     <button onClick={() => handleRemoveMember(member.name, 'AMIR')} className="text-slate-500 hover:text-red-400 transition-colors">
@@ -1513,7 +1587,10 @@ const App: React.FC = () => {
                                     {member.password && <i className="fas fa-lock text-[10px] text-slate-500" title="Şifreli"></i>}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <button onClick={() => setPasswordChangeModal({show: true, memberName: member.name, role: 'USTA'})} className="text-slate-500 hover:text-blue-400 transition-colors">
+                                    <button onClick={() => { setRenameModal({show: true, oldName: member.name, role: 'USTA'}); setRenameInput(member.name); }} className="text-slate-500 hover:text-blue-400 transition-colors">
+                                        <i className="fas fa-pen text-xs"></i>
+                                    </button>
+                                    <button onClick={() => { setPasswordChangeModal({show: true, memberName: member.name, role: 'USTA'}); setNewPasswordInput(member.password || ''); }} className="text-slate-500 hover:text-blue-400 transition-colors">
                                         <i className="fas fa-key text-xs"></i>
                                     </button>
                                     <button onClick={() => handleRemoveMember(member.name, 'USTA')} className="text-slate-500 hover:text-red-400 transition-colors">
@@ -1570,6 +1647,35 @@ const App: React.FC = () => {
                </div>
            )}
         </div>
+      )}
+
+      {/* İsim Değiştirme Modalı */}
+      {renameModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200">
+              <div className="bg-slate-800 rounded-2xl w-full max-w-xs border border-slate-700 shadow-2xl p-5">
+                  <h3 className="text-sm font-black text-slate-100 mb-1">İsim Güncelle</h3>
+                  <p className="text-xs text-slate-400 mb-4">Bu işlem tüm geçmiş kayıtları da günceller.</p>
+                  
+                  <form onSubmit={handleRenameMember}>
+                      <input 
+                          type="text" 
+                          autoFocus
+                          placeholder="Yeni İsim"
+                          className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white text-sm mb-4 outline-none focus:border-blue-500"
+                          value={renameInput}
+                          onChange={(e) => setRenameInput(e.target.value)}
+                      />
+                      <div className="flex gap-2">
+                          <button type="button" onClick={() => { setRenameModal(null); setRenameInput(''); }} className="flex-1 py-2 bg-slate-700 text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-600">
+                              İptal
+                          </button>
+                          <button type="submit" className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700">
+                              Güncelle
+                          </button>
+                      </div>
+                  </form>
+              </div>
+          </div>
       )}
 
       {/* Şifre Değiştirme Modalı */}
