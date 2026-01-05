@@ -34,6 +34,9 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'tasks' | 'add' | 'profile' | 'requests' | 'calendar'>('tasks');
   const [activeTaskTab, setActiveTaskTab] = useState<TaskTab>('active'); // Görevler alt sekmeleri
 
+  // Filtreleme State'i (Sadece Amirler İçin)
+  const [selectedUstaFilter, setSelectedUstaFilter] = useState<string>('ALL');
+
   const [connectionId, setConnectionId] = useState(getStoredBinId());
 
   // Senkronizasyon Zamanlayıcısı (Amir İçin)
@@ -838,6 +841,7 @@ const App: React.FC = () => {
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-slate-900 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-6 text-white overflow-y-auto relative">
+        {/* ... (Login UI Code remains same) ... */}
         <div className="w-full max-w-sm animate-in zoom-in duration-500">
           <div className="flex flex-col items-center mb-10">
             <div className="bg-white/5 p-4 rounded-3xl shadow-[0_0_40px_rgba(59,130,246,0.2)] mb-6 ring-4 ring-white/10 backdrop-blur-sm">
@@ -987,38 +991,71 @@ const App: React.FC = () => {
     );
   }
 
+  // USTA FİLTRELEME UI RENDER (SADECE AMİR)
+  const renderUstaFilter = () => {
+    if (currentUser?.role !== 'AMIR') return null; // Sadece Amir görür
+    return (
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 no-scrollbar">
+            <button
+                onClick={() => setSelectedUstaFilter('ALL')}
+                className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition-all border ${selectedUstaFilter === 'ALL' ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/40' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
+            >
+                <i className="fas fa-users mr-2"></i>Tümü
+            </button>
+            {ustaList.map(u => (
+                <button
+                    key={u.name}
+                    onClick={() => setSelectedUstaFilter(u.name)}
+                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition-all border ${selectedUstaFilter === u.name ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/40' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
+                >
+                    <i className="fas fa-user mr-2"></i>{u.name}
+                </button>
+            ))}
+        </div>
+    );
+  };
+
   // Görevleri sekmeye göre filtreleme mantığı
   const getFilteredTasks = () => {
-      // 1. Önce kullanıcı rolüne göre filtrele (Usta sadece kendi işlerini görür, silinenler hariç)
-      // Ancak "Silinenler" sekmesinde ustalar da sadece kendi silinenlerini görmeli mi?
-      // Varsayım: Ustalar sadece kendi aktif/geçmiş işlerini görür. Silinenler genelde yönetici içindir ama usta da görebilsin kendi sildiklerini.
+      // 1. Önce kullanıcı rolüne göre filtrele
       
       let sourceTasks = tasks;
       if (activeTaskTab === 'deleted') {
           sourceTasks = archivedTasks;
       }
 
-      let userFiltered = currentUser.role === 'USTA' 
-        ? sourceTasks.filter(t => t.masterName === currentUser.name)
-        : sourceTasks;
+      let filtered = sourceTasks;
+
+      // USTA ise sadece kendi görevleri
+      if (currentUser.role === 'USTA') {
+          filtered = sourceTasks.filter(t => t.masterName === currentUser.name);
+      } 
+      // AMİR ise ve filtre seçiliyse
+      else if (currentUser.role === 'AMIR' && selectedUstaFilter !== 'ALL') {
+          filtered = sourceTasks.filter(t => t.masterName === selectedUstaFilter);
+      }
 
       // 2. Sekmeye göre durum filtresi
       if (activeTaskTab === 'active') {
-          return userFiltered.filter(t => t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.CANCELLED);
+          return filtered.filter(t => t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.CANCELLED);
       } else if (activeTaskTab === 'history') {
-          return userFiltered.filter(t => t.status === TaskStatus.COMPLETED || t.status === TaskStatus.CANCELLED);
+          return filtered.filter(t => t.status === TaskStatus.COMPLETED || t.status === TaskStatus.CANCELLED);
       } else {
           // deleted
-          return userFiltered; // Zaten archivedTasks'dan geliyor
+          return filtered; // Zaten archivedTasks'dan geliyor
       }
   };
 
   const filteredTasks = getFilteredTasks();
 
-  // Talepleri filtrele: Usta ise sadece kendininkileri, Amir ise hepsini görsün.
-  const filteredRequests = currentUser.role === 'USTA'
-    ? requests.filter(r => r.ustaName === currentUser.name)
-    : requests;
+  // Talepleri filtrele: Usta ise sadece kendininkileri, Amir ise seçili filtreye göre
+  const filteredRequests = requests.filter(r => {
+      if (currentUser.role === 'USTA') return r.ustaName === currentUser.name;
+      // Amir ve filtre seçili
+      if (currentUser.role === 'AMIR' && selectedUstaFilter !== 'ALL') return r.ustaName === selectedUstaFilter;
+      // Amir ve tümü
+      return true;
+  });
 
   const isErkan = currentUser.name === 'Birim Amiri ERKAN ÇİLİNGİR';
 
@@ -1072,6 +1109,9 @@ const App: React.FC = () => {
                   Silinenler
               </button>
           </div>
+
+          {/* Usta Filtre Barı (Tasks) */}
+          {renderUstaFilter()}
           
           <div className="space-y-6">
             {loading && activeTaskTab === 'deleted' ? (
@@ -1083,8 +1123,9 @@ const App: React.FC = () => {
                 <div className="flex flex-col items-center justify-center py-20 opacity-50 text-slate-600">
                     <i className={`fas ${activeTaskTab === 'deleted' ? 'fa-trash' : 'fa-clipboard-list'} text-6xl mb-4`}></i>
                     <p className="font-bold">
-                        {activeTaskTab === 'active' ? 'Aktif görev yok' : 
-                         activeTaskTab === 'history' ? 'Tamamlanan görev yok' : 'Silinen görev yok'}
+                        {selectedUstaFilter !== 'ALL' ? `Bu ustaya ait ${activeTaskTab === 'active' ? 'aktif' : activeTaskTab === 'history' ? 'tamamlanmış' : 'silinmiş'} görev yok` : 
+                        (activeTaskTab === 'active' ? 'Aktif görev yok' : 
+                         activeTaskTab === 'history' ? 'Tamamlanan görev yok' : 'Silinen görev yok')}
                     </p>
                 </div>
             ) : (
@@ -1119,6 +1160,7 @@ const App: React.FC = () => {
         <div className="animate-in slide-in-from-bottom-4 duration-500 pb-24">
             <h2 className="text-2xl font-black text-slate-100 mb-6 px-1">Yeni İş Emri</h2>
             <form onSubmit={handleCreateTask} className="space-y-4">
+                {/* Form Inputs ... */}
                 <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-lg">
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Makine / Bölge</label>
                     <input 
@@ -1212,6 +1254,9 @@ const App: React.FC = () => {
          <div className="animate-in fade-in duration-500 pb-24">
             <h2 className="text-2xl font-black text-slate-100 mb-6 px-1">Malzeme & İzin Talepleri</h2>
             
+            {/* Usta Filtre Barı (Requests) */}
+            {renderUstaFilter()}
+
             {currentUser.role === 'USTA' && (
                 <form onSubmit={handleCreateRequest} className="mb-8 bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-lg">
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Yeni Talep Oluştur</label>
