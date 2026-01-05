@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Task, User, TaskStatus, TaskPriority, Member, UstaRequest, RequestStatus, LeaveRequest } from './types';
-import { fetchAppData, saveAppData, createNewBin, getStoredBinId, setStoredBinId, extractBinId, checkConnection, archiveDeletedTask, fetchArchivedTasks, permanentlyDeleteTask } from './services/dbService';
+import { fetchAppData, saveAppData, createNewBin, getStoredBinId, setStoredBinId, extractBinId, checkConnection } from './services/dbService';
 import Layout from './components/Layout';
 import TaskCard from './components/TaskCard';
 import CalendarView from './components/CalendarView';
@@ -194,6 +194,7 @@ const App: React.FC = () => {
     setTasks(data.tasks);
     setRequests(data.requests);
     setLeaves(data.leaves);
+    setArchivedTasks(data.deletedTasks); // YENİ: Artık ana veriden geliyor
     
     // İlk yüklemede mevcut ID'leri kaydet ki bildirim gitmesin
     if (isFirstLoadRef.current && data.tasks.length > 0) {
@@ -218,17 +219,6 @@ const App: React.FC = () => {
       }
       return () => clearInterval(interval);
   }, [lastSyncTime, currentUser]);
-
-  // Silinenler sekmesine geçildiğinde arşiv verilerini çek
-  useEffect(() => {
-      if (activeTaskTab === 'deleted') {
-          setLoading(true);
-          fetchArchivedTasks().then(data => {
-              setArchivedTasks(data);
-              setLoading(false);
-          });
-      }
-  }, [activeTaskTab]);
 
   // Online Heartbeat (Her 10 saniyede bir lastActive günceller - DAHA SIK)
   useEffect(() => {
@@ -272,7 +262,8 @@ const App: React.FC = () => {
                 requests: data.requests, 
                 leaves: data.leaves, 
                 amirs: updatedAmirs, 
-                ustas: updatedUstas 
+                ustas: updatedUstas,
+                deletedTasks: data.deletedTasks // deletedTasks'i de koru
             }, connectionId);
         }
     };
@@ -316,6 +307,8 @@ const App: React.FC = () => {
              setTasks(data.tasks);
              setRequests(data.requests);
              setLeaves(data.leaves);
+             setArchivedTasks(data.deletedTasks);
+
              // İlk yükleme olduğu için ID'leri sete at
              data.tasks.forEach(t => lastTaskIdsRef.current.add(t.id));
              isFirstLoadRef.current = false;
@@ -338,6 +331,8 @@ const App: React.FC = () => {
             setTasks(data.tasks);
             setRequests(data.requests);
             setLeaves(data.leaves);
+            setArchivedTasks(data.deletedTasks);
+
             if (data.amirs) setAmirList(data.amirs);
             if (data.ustas) setUstaList(data.ustas);
 
@@ -519,7 +514,7 @@ const App: React.FC = () => {
         setUstaList(newUstas);
     }
 
-    await saveAppData({ tasks, requests, leaves, amirs: newAmirs, ustas: newUstas }, connectionId);
+    await saveAppData({ tasks, requests, leaves, amirs: newAmirs, ustas: newUstas, deletedTasks: archivedTasks }, connectionId);
     setNewMemberName('');
     setNewMemberPassword('');
     setNewMemberPhone('');
@@ -542,7 +537,7 @@ const App: React.FC = () => {
           setUstaList(newUstas);
       }
       
-      await saveAppData({ tasks, requests, leaves, amirs: newAmirs, ustas: newUstas }, connectionId);
+      await saveAppData({ tasks, requests, leaves, amirs: newAmirs, ustas: newUstas, deletedTasks: archivedTasks }, connectionId);
       setLoading(false);
   };
 
@@ -569,7 +564,7 @@ const App: React.FC = () => {
         setUstaList(newUstas);
     }
 
-    await saveAppData({ tasks, requests, leaves, amirs: newAmirs, ustas: newUstas }, connectionId);
+    await saveAppData({ tasks, requests, leaves, amirs: newAmirs, ustas: newUstas, deletedTasks: archivedTasks }, connectionId);
     setLoading(false);
     setPasswordChangeModal(null);
     setNewPasswordInput('');
@@ -631,7 +626,7 @@ const App: React.FC = () => {
     lastTaskIdsRef.current.add(newTask.id);
     
     setLoading(true);
-    await saveAppData({ tasks: updatedTasks, requests, leaves, amirs: amirList, ustas: ustaList }, connectionId);
+    await saveAppData({ tasks: updatedTasks, requests, leaves, amirs: amirList, ustas: ustaList, deletedTasks: archivedTasks }, connectionId);
     setLoading(false);
     
     // WHATSAPP ENTEGRASYONU
@@ -683,7 +678,7 @@ const App: React.FC = () => {
       setTasks(updatedTasks);
       
       // Arka planda kaydet
-      await saveAppData({ tasks: updatedTasks, requests, leaves, amirs: amirList, ustas: ustaList }, connectionId);
+      await saveAppData({ tasks: updatedTasks, requests, leaves, amirs: amirList, ustas: ustaList, deletedTasks: archivedTasks }, connectionId);
   };
 
   const updateTaskStatus = async (taskId: string, newStatus: TaskStatus, comment?: string, completedImage?: string) => {
@@ -705,7 +700,7 @@ const App: React.FC = () => {
     });
     
     setTasks(updatedTasks);
-    await saveAppData({ tasks: updatedTasks, requests, leaves, amirs: amirList, ustas: ustaList }, connectionId);
+    await saveAppData({ tasks: updatedTasks, requests, leaves, amirs: amirList, ustas: ustaList, deletedTasks: archivedTasks }, connectionId);
     setLoading(false);
   };
 
@@ -719,13 +714,29 @@ const App: React.FC = () => {
 
     // 2. Eğer görev varsa, önce arşive gönder
     if (taskToDelete) {
-        await archiveDeletedTask(taskToDelete);
-    }
+        // Yeni: saveAppData ile kaydet
+        const taskWithDeletedAt = { ...taskToDelete, deletedAt: Date.now() };
+        const newArchived = [taskWithDeletedAt, ...archivedTasks];
+        const newTasks = tasks.filter(t => t.id !== taskId);
 
-    // 3. Görevi mevcut listeden sil
-    const updatedTasks = tasks.filter(t => t.id !== taskId);
-    setTasks(updatedTasks);
-    await saveAppData({ tasks: updatedTasks, requests, leaves, amirs: amirList, ustas: ustaList }, connectionId);
+        setTasks(newTasks);
+        setArchivedTasks(newArchived);
+
+        await saveAppData({ 
+            tasks: newTasks, 
+            requests, 
+            leaves, 
+            amirs: amirList, 
+            ustas: ustaList, 
+            deletedTasks: newArchived // Arşiv güncellendi
+        }, connectionId);
+    } else {
+        // Zaten listede yoksa sadece UI güncelle (Nadiren olur)
+        const newTasks = tasks.filter(t => t.id !== taskId);
+        setTasks(newTasks);
+        await saveAppData({ tasks: newTasks, requests, leaves, amirs: amirList, ustas: ustaList, deletedTasks: archivedTasks }, connectionId);
+    }
+    
     setLoading(false);
   };
 
@@ -734,15 +745,22 @@ const App: React.FC = () => {
       if(!confirm("DİKKAT! Bu işlem geri alınamaz!\n\nGörev veritabanından tamamen silinecek. Devam edilsin mi?")) return;
       
       setLoading(true);
-      const success = await permanentlyDeleteTask(taskId);
       
-      if(success) {
-          setArchivedTasks(prev => prev.filter(t => t.id !== taskId));
-          alert("Görev kalıcı olarak silindi.");
-      } else {
-          alert("Silme işlemi başarısız oldu.");
-      }
+      // Yeni: saveAppData ile kaydet
+      const newArchived = archivedTasks.filter(t => t.id !== taskId);
+      setArchivedTasks(newArchived);
+
+      await saveAppData({ 
+          tasks, 
+          requests, 
+          leaves, 
+          amirs: amirList, 
+          ustas: ustaList, 
+          deletedTasks: newArchived 
+      }, connectionId);
+      
       setLoading(false);
+      alert("Görev kalıcı olarak silindi.");
   };
 
   // USTA TALEP OLUŞTURMA
@@ -762,7 +780,7 @@ const App: React.FC = () => {
     setRequests(updatedRequests);
     
     setLoading(true);
-    await saveAppData({ tasks, requests: updatedRequests, leaves, amirs: amirList, ustas: ustaList }, connectionId);
+    await saveAppData({ tasks, requests: updatedRequests, leaves, amirs: amirList, ustas: ustaList, deletedTasks: archivedTasks }, connectionId);
     setLoading(false);
     
     setNewRequestContent('');
@@ -793,7 +811,7 @@ const App: React.FC = () => {
       setLeaves(updatedLeaves);
       
       setLoading(true);
-      await saveAppData({ tasks, requests, leaves: updatedLeaves, amirs: amirList, ustas: ustaList }, connectionId);
+      await saveAppData({ tasks, requests, leaves: updatedLeaves, amirs: amirList, ustas: ustaList, deletedTasks: archivedTasks }, connectionId);
       setLoading(false);
       alert("İzin talebi oluşturuldu.");
   };
@@ -802,7 +820,7 @@ const App: React.FC = () => {
       if(!confirm("İzin talebini silmek istediğinize emin misiniz?")) return;
       const updatedLeaves = leaves.filter(l => l.id !== leaveId);
       setLeaves(updatedLeaves);
-      await saveAppData({ tasks, requests, leaves: updatedLeaves, amirs: amirList, ustas: ustaList }, connectionId);
+      await saveAppData({ tasks, requests, leaves: updatedLeaves, amirs: amirList, ustas: ustaList, deletedTasks: archivedTasks }, connectionId);
   };
 
   const handleLeaveStatus = async (leaveId: string, status: RequestStatus) => {
@@ -811,7 +829,7 @@ const App: React.FC = () => {
           return l;
       });
       setLeaves(updatedLeaves);
-      await saveAppData({ tasks, requests, leaves: updatedLeaves, amirs: amirList, ustas: ustaList }, connectionId);
+      await saveAppData({ tasks, requests, leaves: updatedLeaves, amirs: amirList, ustas: ustaList, deletedTasks: archivedTasks }, connectionId);
   };
 
   // TALEP DURUM GÜNCELLEME (AMİR)
@@ -824,7 +842,7 @@ const App: React.FC = () => {
         return r;
     });
     setRequests(updatedRequests);
-    await saveAppData({ tasks, requests: updatedRequests, leaves, amirs: amirList, ustas: ustaList }, connectionId);
+    await saveAppData({ tasks, requests: updatedRequests, leaves, amirs: amirList, ustas: ustaList, deletedTasks: archivedTasks }, connectionId);
     setLoading(false);
   };
 
@@ -834,7 +852,7 @@ const App: React.FC = () => {
       setLoading(true);
       const updatedRequests = requests.filter(r => r.id !== reqId);
       setRequests(updatedRequests);
-      await saveAppData({ tasks, requests: updatedRequests, leaves, amirs: amirList, ustas: ustaList }, connectionId);
+      await saveAppData({ tasks, requests: updatedRequests, leaves, amirs: amirList, ustas: ustaList, deletedTasks: archivedTasks }, connectionId);
       setLoading(false);
   };
 
@@ -1114,10 +1132,10 @@ const App: React.FC = () => {
           {renderUstaFilter()}
           
           <div className="space-y-6">
-            {loading && activeTaskTab === 'deleted' ? (
-                <div className="text-center py-10">
-                    <i className="fas fa-spinner fa-spin text-2xl text-slate-500 mb-2"></i>
-                    <p className="text-slate-500 text-xs">Arşiv yükleniyor...</p>
+            {loading && activeTaskTab === 'deleted' && filteredTasks.length === 0 ? (
+                 <div className="flex flex-col items-center justify-center py-20 opacity-50 text-slate-600">
+                    <i className="fas fa-trash text-6xl mb-4"></i>
+                    <p className="font-bold">Silinen görev yok</p>
                 </div>
             ) : filteredTasks.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 opacity-50 text-slate-600">

@@ -18,15 +18,13 @@ const LOCAL_KEY_DATA = 'hidro_data';
 // Demo ID
 const DEMO_ID = '908d1788734268713503'; 
 
-// Silinen Görevlerin Arşivleneceği Sabit ID
-const ARCHIVE_BIN_ID = 'b377ac3abf9b89fad6b0';
-
 export interface AppData {
   tasks: Task[];
   requests: UstaRequest[];
   leaves: LeaveRequest[];
   amirs: Member[];
   ustas: Member[];
+  deletedTasks: Task[]; // YENİ: Silinen görevler ana veride tutuluyor
   updatedAt: number;
 }
 
@@ -92,6 +90,7 @@ export const createNewBin = async (defaultAmirs: Member[], defaultUstas: Member[
     leaves: [],
     amirs: defaultAmirs,
     ustas: defaultUstas,
+    deletedTasks: [],
     updatedAt: Date.now()
   };
 
@@ -137,89 +136,12 @@ export const createNewBin = async (defaultAmirs: Member[], defaultUstas: Member[
   return null;
 };
 
-// Silinen Görevleri Arşivler (İkinci veritabanı bağlantısı)
-export const archiveDeletedTask = async (task: Task) => {
-  const url = getProviderUrl(ARCHIVE_BIN_ID);
-  
-  try {
-    // 1. Mevcut arşiv verisini çek
-    const response = await fetch(url);
-    let deletedTasks: Task[] = [];
-    
-    if (response.ok) {
-        const data = await response.json();
-        // Veri yapısını kontrol et (Düz array mi obje mi)
-        if (Array.isArray(data)) {
-            deletedTasks = data;
-        } else if (data && Array.isArray(data.deletedTasks)) {
-            deletedTasks = data.deletedTasks;
-        }
-    }
-
-    // 2. Yeni silinen görevi listeye ekle (En başa)
-    const taskToArchive = { ...task, deletedAt: Date.now() };
-    deletedTasks.unshift(taskToArchive);
-
-    // 3. Arşivi güncelle
-    await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deletedTasks, updatedAt: Date.now() })
-    });
-    console.log("Görev arşivlendi:", task.machineName);
-    
-  } catch (e) {
-      console.error("Arşivleme hatası:", e);
-      // Arşivleme hatası ana akışı bozmamalı
-  }
-};
-
-// Arşivlenmiş (Silinmiş) Görevleri Çeker
-export const fetchArchivedTasks = async (): Promise<Task[]> => {
-    const url = getProviderUrl(ARCHIVE_BIN_ID);
-    try {
-        const response = await fetch(url);
-        if (response.ok) {
-            const data = await response.json();
-            if (Array.isArray(data)) return data;
-            if (data && Array.isArray(data.deletedTasks)) return data.deletedTasks;
-        }
-    } catch (e) {
-        console.error("Arşiv çekme hatası:", e);
-    }
-    return [];
-};
-
-// Arşivden Kalıcı Olarak Silme
-export const permanentlyDeleteTask = async (taskId: string): Promise<boolean> => {
-    const url = getProviderUrl(ARCHIVE_BIN_ID);
-    try {
-        // 1. Mevcut arşivi çek
-        const currentTasks = await fetchArchivedTasks();
-        
-        // 2. İlgili görevi filtrele
-        const updatedTasks = currentTasks.filter(t => t.id !== taskId);
-
-        // 3. Güncel listeyi kaydet
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ deletedTasks: updatedTasks, updatedAt: Date.now() })
-        });
-        
-        return response.ok;
-    } catch (e) {
-        console.error("Kalıcı silme hatası:", e);
-        return false;
-    }
-};
-
 // Tüm verileri (Görevler + Personel Listesi) çeker
 export const fetchAppData = async (binId?: string): Promise<AppData> => {
   const id = binId || getStoredBinId();
   
   // Varsayılan boş yapı
-  const emptyData: AppData = { tasks: [], requests: [], leaves: [], amirs: [], ustas: [], updatedAt: 0 };
+  const emptyData: AppData = { tasks: [], requests: [], leaves: [], amirs: [], ustas: [], deletedTasks: [], updatedAt: 0 };
 
   if (!id) {
     const localDataStr = localStorage.getItem(LOCAL_KEY_DATA);
@@ -234,7 +156,8 @@ export const fetchAppData = async (binId?: string): Promise<AppData> => {
            requests: Array.isArray(parsed.requests) ? parsed.requests : [],
            leaves: Array.isArray(parsed.leaves) ? parsed.leaves : [],
            amirs: normalizeMembers(parsed.amirs),
-           ustas: normalizeMembers(parsed.ustas)
+           ustas: normalizeMembers(parsed.ustas),
+           deletedTasks: Array.isArray(parsed.deletedTasks) ? parsed.deletedTasks : []
        };
     }
     return emptyData;
@@ -256,6 +179,7 @@ export const fetchAppData = async (binId?: string): Promise<AppData> => {
       let leaves: LeaveRequest[] = [];
       let amirs: Member[] = [];
       let ustas: Member[] = [];
+      let deletedTasks: Task[] = [];
 
       if (Array.isArray(data)) {
         tasks = data;
@@ -265,9 +189,18 @@ export const fetchAppData = async (binId?: string): Promise<AppData> => {
         leaves = Array.isArray(data.leaves) ? data.leaves : [];
         amirs = normalizeMembers(data.amirs);
         ustas = normalizeMembers(data.ustas);
+        deletedTasks = Array.isArray(data.deletedTasks) ? data.deletedTasks : [];
       }
       
-      const normalizedData: AppData = { tasks, requests, leaves, amirs, ustas, updatedAt: data.updatedAt || Date.now() };
+      const normalizedData: AppData = { 
+          tasks, 
+          requests, 
+          leaves, 
+          amirs, 
+          ustas, 
+          deletedTasks, 
+          updatedAt: data.updatedAt || Date.now() 
+      };
       
       localStorage.setItem(LOCAL_KEY_DATA, JSON.stringify(normalizedData));
       return normalizedData;
@@ -287,7 +220,8 @@ export const fetchAppData = async (binId?: string): Promise<AppData> => {
           requests: Array.isArray(parsed.requests) ? parsed.requests : [],
           leaves: Array.isArray(parsed.leaves) ? parsed.leaves : [],
           amirs: normalizeMembers(parsed.amirs),
-          ustas: normalizeMembers(parsed.ustas)
+          ustas: normalizeMembers(parsed.ustas),
+          deletedTasks: Array.isArray(parsed.deletedTasks) ? parsed.deletedTasks : []
       };
   }
   return emptyData;
