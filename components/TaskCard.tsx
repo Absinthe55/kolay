@@ -379,7 +379,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                     <textarea 
                       className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-sm mb-4 focus:ring-2 focus:ring-emerald-500 focus:bg-slate-900 outline-none transition-all placeholder:text-slate-600 text-white"
                       rows={3}
-                      placeholder="Yapılan işlemleri detaylıca yazınız..."
+                      placeholder="Yapılan işlemleri yazınız (Opsiyonel)"
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
                     ></textarea>
@@ -417,7 +417,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                       </button>
                       <button 
                         onClick={submitCompletion}
-                        disabled={!comment.trim() || isProcessing}
+                        disabled={isProcessing}
                         className="flex-[2] py-3 bg-emerald-600 text-white rounded-xl font-bold text-xs shadow-lg shadow-emerald-900/40 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       >
                         ONAYLA VE BİTİR

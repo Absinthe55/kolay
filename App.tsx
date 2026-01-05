@@ -35,6 +35,10 @@ const App: React.FC = () => {
   const [activeTaskTab, setActiveTaskTab] = useState<TaskTab>('active'); // Görevler alt sekmeleri
 
   const [connectionId, setConnectionId] = useState(getStoredBinId());
+
+  // Senkronizasyon Zamanlayıcısı (Amir İçin)
+  const [lastSyncTime, setLastSyncTime] = useState<number>(Date.now());
+  const [msSinceSync, setMsSinceSync] = useState<number>(0);
   
   // Personel Yönetimi State'leri
   const [newMemberName, setNewMemberName] = useState('');
@@ -95,10 +99,10 @@ const App: React.FC = () => {
     }
   };
 
-  // Online Durumu Kontrolü (Son 2 dakika)
+  // Online Durumu Kontrolü (Son 25 saniye)
   const isUserOnline = (lastActive?: number) => {
       if (!lastActive) return false;
-      return (Date.now() - lastActive) < 2 * 60 * 1000; // 2 dakika
+      return (Date.now() - lastActive) < 25 * 1000; // 25 saniye (Daha hassas)
   };
 
   // Son Görülme Zamanı Formatlama
@@ -108,8 +112,8 @@ const App: React.FC = () => {
       const diff = now - timestamp;
       const date = new Date(timestamp);
 
-      // 2 dakikadan az ise
-      if (diff < 2 * 60 * 1000) return 'Çevrimiçi';
+      // 25 saniyeden az ise
+      if (diff < 25 * 1000) return 'Çevrimiçi';
 
       // Bugün mü?
       const isToday = date.getDate() === new Date().getDate() &&
@@ -181,6 +185,9 @@ const App: React.FC = () => {
     const targetId = forceId || connectionId;
     const data = await fetchAppData(targetId);
     
+    // Senkronizasyon zamanını sıfırla
+    setLastSyncTime(Date.now());
+
     setTasks(data.tasks);
     setRequests(data.requests);
     setLeaves(data.leaves);
@@ -198,6 +205,17 @@ const App: React.FC = () => {
     setLoading(false);
   }, [connectionId]);
 
+  // MS Sayacı Efekti (Sadece Amir için arayüzde gösteriliyor ama state hep çalışsın)
+  useEffect(() => {
+      let interval: ReturnType<typeof setInterval>;
+      if (currentUser?.role === 'AMIR') {
+          interval = setInterval(() => {
+              setMsSinceSync(Date.now() - lastSyncTime);
+          }, 75); // Ekranı yormasın diye 75ms
+      }
+      return () => clearInterval(interval);
+  }, [lastSyncTime, currentUser]);
+
   // Silinenler sekmesine geçildiğinde arşiv verilerini çek
   useEffect(() => {
       if (activeTaskTab === 'deleted') {
@@ -209,7 +227,7 @@ const App: React.FC = () => {
       }
   }, [activeTaskTab]);
 
-  // Online Heartbeat (Her 60 saniyede bir lastActive günceller)
+  // Online Heartbeat (Her 10 saniyede bir lastActive günceller - DAHA SIK)
   useEffect(() => {
     if (!currentUser || !connectionId) return;
 
@@ -259,7 +277,7 @@ const App: React.FC = () => {
     // İlk girişte hemen gönder
     sendHeartbeat();
 
-    const interval = setInterval(sendHeartbeat, 60000); // 1 dakika
+    const interval = setInterval(sendHeartbeat, 10000); // 10 saniye (Daha sık heartbeat)
     return () => clearInterval(interval);
   }, [currentUser, connectionId]);
 
@@ -306,10 +324,13 @@ const App: React.FC = () => {
     };
     initAutoConnect();
 
-    // 4. Periyodik güncelleme ve Bildirim Kontrolü
+    // 4. Periyodik güncelleme ve Bildirim Kontrolü (2 Saniyede Bir - DAHA SIK)
     const interval = setInterval(() => {
       if (connectionId) {
         fetchAppData(connectionId).then(data => {
+            // Senkronizasyon zamanını sıfırla
+            setLastSyncTime(Date.now());
+
             // State güncelle
             setTasks(data.tasks);
             setRequests(data.requests);
@@ -344,7 +365,7 @@ const App: React.FC = () => {
             }
         });
       }
-    }, 5000); 
+    }, 2000); // 2 saniye
 
     // Sayfa görünür olduğunda (arkaplansan dönünce) hemen veri çek
     const handleVisibilityChange = () => {
@@ -391,6 +412,7 @@ const App: React.FC = () => {
       role
     };
     setCurrentUser(user);
+    setActiveTab('tasks'); // Giriş yapınca her zaman Görevler ekranına at
 
     if (remember) {
       localStorage.setItem(LOCAL_KEY_AUTH, JSON.stringify(user));
@@ -1016,9 +1038,17 @@ const App: React.FC = () => {
                 <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Hoş Geldiniz,</p>
                 <h2 className="text-3xl font-black text-slate-100 tracking-tight leading-none">{currentUser.name.split(' ')[0]} Bey</h2>
             </div>
-            <button onClick={() => loadData()} disabled={loading} className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-slate-800 border border-slate-700 text-blue-500 shadow-lg shadow-blue-900/20 hover:shadow-xl hover:bg-slate-750 transition-all ${loading ? 'animate-spin' : ''}`}>
-                <i className="fas fa-sync-alt"></i>
-            </button>
+            <div className="flex flex-col items-end gap-1">
+                <button onClick={() => loadData()} disabled={loading} className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-slate-800 border border-slate-700 text-blue-500 shadow-lg shadow-blue-900/20 hover:shadow-xl hover:bg-slate-750 transition-all ${loading ? 'animate-spin' : ''}`}>
+                    <i className="fas fa-sync-alt"></i>
+                </button>
+                {/* Amir için MS Sayacı */}
+                {currentUser.role === 'AMIR' && (
+                    <span className="text-[9px] font-mono text-slate-500 bg-slate-800/50 px-1.5 py-0.5 rounded border border-slate-800">
+                        {msSinceSync}ms
+                    </span>
+                )}
+            </div>
           </div>
 
           {/* Görev Sekmeleri */}
