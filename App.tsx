@@ -526,18 +526,30 @@ const App: React.FC = () => {
           lastActive: Date.now()
       };
       
+      // Varsayılan bir usta ekleyelim ki liste boş görünmesin
+      const defaultUsta: Member = {
+          name: 'Usta 1',
+          avatar: 'https://cdn-icons-png.flaticon.com/512/4792/4792929.png',
+          lastActive: 0
+      };
+      
       const initialData = {
           tasks: [],
           requests: [],
           leaves: [],
           amirs: [defaultAmir],
-          ustas: [],
+          ustas: [defaultUsta],
           deletedTasks: []
       };
 
       await saveAppData(initialData, connectionId);
-      await loadData();
-      setLoading(false);
+      
+      // Firebase'in işlemi tamamlaması için kısa bir gecikme ve yeniden yükleme
+      setTimeout(async () => {
+          await loadData();
+          setLoading(false);
+          alert("Sistem başarıyla başlatıldı! Artık giriş yapabilirsiniz.");
+      }, 1500);
   };
 
   const handleLoginClick = (member: Member, role: 'AMIR' | 'USTA') => {
@@ -1148,7 +1160,7 @@ const App: React.FC = () => {
           </div>
           
           <div className="space-y-6 bg-white/5 backdrop-blur-lg p-6 rounded-3xl border border-white/10 shadow-2xl">
-            {/* BOŞ VERİTABANI DURUMU - YENİ ÖZELLİK */}
+            {/* BOŞ VERİTABANI DURUMU */}
             {!loading && amirList.length === 0 && ustaList.length === 0 && (
                 <div className="bg-blue-600/20 border border-blue-500/30 p-5 rounded-2xl text-center mb-6 animate-in fade-in zoom-in shadow-lg">
                     <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -1288,7 +1300,7 @@ const App: React.FC = () => {
             )}
 
           </div>
-          <p className="text-center text-[10px] text-slate-600 mt-6 font-mono">v1.0.8 &bull; Hızlı Senkronizasyon</p>
+          <p className="text-center text-[10px] text-slate-600 mt-6 font-mono">v1.0.9 &bull; Hızlı Senkronizasyon</p>
         </div>
 
         {/* Login Password Modal */}
@@ -1718,7 +1730,7 @@ const App: React.FC = () => {
                          <span className="text-slate-400">Veri Tabanı:</span>
                          <span className="text-emerald-400 font-bold flex items-center gap-1">
                              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                             Npoint.io (Aktif)
+                             Firebase (Aktif)
                          </span>
                     </div>
                     <div className="flex justify-between items-center text-xs">
