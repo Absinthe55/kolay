@@ -57,6 +57,8 @@ const App: React.FC = () => {
   }, []);
 
   const initApp = async () => {
+      // OTOMATİK GİRİŞ İPTAL EDİLDİ: Kullanıcılar her seferinde oturum seçebilmeli.
+      /*
       const storedAuth = localStorage.getItem(LOCAL_KEY_AUTH);
       if (storedAuth) {
           try {
@@ -66,6 +68,7 @@ const App: React.FC = () => {
               }
           } catch (e) { console.error(e); }
       }
+      */
 
       let currentId = getStoredBinId() || AUTO_CONNECT_ID;
 
@@ -222,9 +225,11 @@ const App: React.FC = () => {
   const handleLogin = (user: Member, role: 'AMIR' | 'USTA') => {
       const loggedUser: User = { id: user.name, name: user.name, role, avatar: user.avatar };
       setCurrentUser(loggedUser);
-      localStorage.setItem(LOCAL_KEY_AUTH, JSON.stringify(loggedUser));
+      // localStorage.setItem(LOCAL_KEY_AUTH, JSON.stringify(loggedUser)); // Auto-login disabled
   };
   const handleLogout = () => { setCurrentUser(null); localStorage.removeItem(LOCAL_KEY_AUTH); };
+  const handleDisconnect = () => { setBinId(''); setStoredBinId(''); handleLogout(); };
+
   const handleConnect = async () => {
       setConnectionStatus('checking');
       const id = extractBinId(loginInput);
@@ -630,11 +635,16 @@ const App: React.FC = () => {
                </div>
            )}
            
-           <div className="text-center pt-8 pb-4">
-               <button onClick={() => { setBinId(''); setStoredBinId(''); handleLogout(); }} className="text-xs font-bold text-red-500/70 hover:text-red-400 transition-colors flex items-center justify-center gap-2 mx-auto">
-                   <i className="fas fa-sign-out-alt"></i> Güvenli Çıkış
+           <div className="flex flex-col gap-3 pt-8 pb-4 max-w-[200px] mx-auto">
+               <button onClick={handleLogout} className="w-full py-3 rounded-xl bg-slate-800 text-white text-xs font-bold hover:bg-slate-700 transition-colors shadow-lg shadow-black/20 flex items-center justify-center gap-2">
+                   <i className="fas fa-user-times"></i> Oturumu Kapat
                </button>
-               <p className="text-[10px] text-slate-600 mt-2 font-mono">ID: {binId}</p>
+               
+               <button onClick={handleDisconnect} className="w-full py-3 rounded-xl border border-red-900/30 text-red-500 text-xs font-bold hover:bg-red-900/10 transition-colors flex items-center justify-center gap-2">
+                   <i className="fas fa-unlink"></i> Gruptan Ayrıl
+               </button>
+               
+               <p className="text-[9px] text-slate-600 text-center font-mono mt-1">Grup ID: {binId}</p>
            </div>
            </div>
         )}
