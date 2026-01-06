@@ -353,8 +353,15 @@ const App: React.FC = () => {
 
   // 2. MAIN APP
   const getDisplayTasks = () => {
+      let filtered = tasks;
+      
+      // GÜVENLİK: Usta sadece kendisine atanan görevleri görebilmeli
+      if (currentUser?.role === 'USTA') {
+          filtered = tasks.filter(t => t.masterName === currentUser.name);
+      }
+
       const priorityOrder = { [TaskPriority.CRITICAL]: 0, [TaskPriority.HIGH]: 1, [TaskPriority.MEDIUM]: 2, [TaskPriority.LOW]: 3 };
-      return [...tasks].sort((a, b) => {
+      return [...filtered].sort((a, b) => {
           if (priorityOrder[a.priority] !== priorityOrder[b.priority]) return priorityOrder[a.priority] - priorityOrder[b.priority];
           return b.createdAt - a.createdAt;
       });
