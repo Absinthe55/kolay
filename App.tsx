@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Layout from './components/Layout';
 import TaskCard from './components/TaskCard';
 import CalendarView from './components/CalendarView';
@@ -26,6 +26,9 @@ const App: React.FC = () => {
   
   // Sync State
   const [isDirty, setIsDirty] = useState(false); // Yerel değişiklik var mı?
+
+  // Refs
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Forms
   const [newRequestContent, setNewRequestContent] = useState('');
@@ -86,6 +89,15 @@ const App: React.FC = () => {
           setAmirs(data.amirs);
           setUstas(data.ustas);
           setDeletedTasks(data.deletedTasks);
+          
+          // Profil fotoğrafı vs. güncellenmişse oturumu güncelle
+          if (currentUser) {
+              const allMembers = [...data.amirs, ...data.ustas];
+              const updatedMe = allMembers.find(m => m.name === currentUser.name);
+              if (updatedMe && updatedMe.avatar !== currentUser.avatar) {
+                  setCurrentUser({ ...currentUser, avatar: updatedMe.avatar });
+              }
+          }
       } catch (e) { console.error(e); }
   };
 
@@ -117,6 +129,27 @@ const App: React.FC = () => {
   }, [tasks, requests, leaves, amirs, ustas, deletedTasks, isDirty]);
 
   // --- ACTIONS ---
+
+  const handleAvatarUpdate = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !currentUser) return;
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+          const base64String = reader.result as string;
+          
+          // Hem listeleri hem de mevcut kullanıcıyı güncelle
+          if (currentUser.role === 'AMIR') {
+              setAmirs(amirs.map(m => m.name === currentUser.name ? { ...m, avatar: base64String } : m));
+          } else {
+              setUstas(ustas.map(m => m.name === currentUser.name ? { ...m, avatar: base64String } : m));
+          }
+          
+          setCurrentUser({ ...currentUser, avatar: base64String });
+          setIsDirty(true);
+      };
+      reader.readAsDataURL(file);
+  };
 
   const handleCreateRequest = (e: React.FormEvent) => {
       e.preventDefault();
@@ -258,12 +291,10 @@ const App: React.FC = () => {
 
   // Login/Connect
   const handleLoginClick = (member: Member, role: 'AMIR' | 'USTA') => {
-      // Eğer şifre atanmamışsa direkt giriş yap
       if (!member.password) {
           performLogin(member, role);
           return;
       }
-      // Şifre varsa şifre sorma ekranına geç
       setPendingLogin({ member, role });
       setLoginPassword('');
       setLoginError('');
@@ -376,8 +407,8 @@ const App: React.FC = () => {
                            <div className="space-y-2">
                                {amirs.map(m => (
                                    <button key={m.name} onClick={() => handleLoginClick(m, 'AMIR')} className="w-full flex items-center gap-4 bg-slate-800/80 p-3 rounded-2xl border border-slate-700 hover:border-blue-500 hover:bg-slate-700 transition-all group">
-                                       <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-blue-400 flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                                           {m.avatar ? <img src={m.avatar} className="w-full h-full object-cover rounded-xl" /> : m.name[0]}
+                                       <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-blue-400 flex items-center justify-center text-white font-bold text-lg shadow-lg overflow-hidden">
+                                           {m.avatar ? <img src={m.avatar} className="w-full h-full object-cover" /> : m.name[0]}
                                        </div>
                                        <div className="flex-1 text-left">
                                            <p className="text-slate-100 font-bold text-lg leading-none">{m.name}</p>
@@ -398,8 +429,8 @@ const App: React.FC = () => {
                            <div className="space-y-2">
                                {ustas.map(m => (
                                    <button key={m.name} onClick={() => handleLoginClick(m, 'USTA')} className="w-full flex items-center gap-4 bg-slate-800/80 p-3 rounded-2xl border border-slate-700 hover:border-emerald-500 hover:bg-slate-700 transition-all group">
-                                       <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-400 flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                                           {m.avatar ? <img src={m.avatar} className="w-full h-full object-cover rounded-xl" /> : m.name[0]}
+                                       <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-400 flex items-center justify-center text-white font-bold text-lg shadow-lg overflow-hidden">
+                                           {m.avatar ? <img src={m.avatar} className="w-full h-full object-cover" /> : m.name[0]}
                                        </div>
                                        <div className="flex-1 text-left">
                                            <p className="text-slate-100 font-bold text-lg leading-none">{m.name}</p>
@@ -475,6 +506,15 @@ const App: React.FC = () => {
   return (
     <Layout user={currentUser} onLogout={handleLogout} activeTab={activeTab} setActiveTab={setActiveTab}>
         
+        {/* Hidden File Input for Avatar */}
+        <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleAvatarUpdate} 
+            accept="image/*" 
+            className="hidden" 
+        />
+
         {/* TAB: TASKS */}
         {activeTab === 'tasks' && (
             <div className="space-y-4 pb-24">
@@ -545,8 +585,8 @@ const App: React.FC = () => {
                                     onClick={() => setNewTaskMaster(u.name)}
                                     className={`flex items-center gap-2 p-2 rounded-xl border transition-all ${newTaskMaster === u.name ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}
                                 >
-                                    <div className="w-6 h-6 rounded-full bg-black/20 flex items-center justify-center text-xs font-bold">
-                                        {u.name[0]}
+                                    <div className="w-6 h-6 rounded-full bg-black/20 flex items-center justify-center text-xs font-bold overflow-hidden">
+                                        {u.avatar ? <img src={u.avatar} className="w-full h-full object-cover" /> : u.name[0]}
                                     </div>
                                     <span className="text-xs font-bold truncate">{u.name}</span>
                                 </button>
@@ -684,11 +724,19 @@ const App: React.FC = () => {
               <div className="relative bg-slate-800/60 backdrop-blur-xl p-8 rounded-3xl border border-white/5 text-center overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-blue-600/20 to-transparent"></div>
                   <div className="relative z-10">
-                      <div className="w-24 h-24 bg-slate-900 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl font-bold text-white border-4 border-slate-800 shadow-2xl">
+                      {/* Avatar with Upload Capability */}
+                      <div 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-24 h-24 bg-slate-900 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl font-bold text-white border-4 border-slate-800 shadow-2xl relative group cursor-pointer overflow-hidden"
+                      >
                           {currentUser.avatar ? <img src={currentUser.avatar} className="w-full h-full rounded-full object-cover" /> : currentUser.name[0]}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <i className="fas fa-camera text-white text-xl"></i>
+                          </div>
                       </div>
                       <h2 className="text-2xl font-black text-white">{currentUser.name}</h2>
                       <p className="text-blue-400 text-xs font-bold uppercase tracking-wider mt-1">{currentUser.role === 'AMIR' ? 'Saha Yöneticisi' : 'Teknik Uzman'}</p>
+                      <button onClick={() => fileInputRef.current?.click()} className="mt-3 text-[10px] text-slate-500 font-bold hover:text-blue-400 transition-colors uppercase tracking-widest"><i className="fas fa-sync mr-1"></i> Fotoğrafı Değiştir</button>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4 mt-8 relative z-10">
@@ -714,8 +762,8 @@ const App: React.FC = () => {
                         {[...amirList, ...ustaList].map(member => (
                             <div key={member.name} className="flex justify-between items-center bg-slate-900/40 p-3 rounded-xl border border-white/5">
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${member.password ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                                        {member.name[0]}
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold overflow-hidden ${member.password ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                                        {member.avatar ? <img src={member.avatar} className="w-full h-full object-cover" /> : member.name[0]}
                                     </div>
                                     <span className="text-sm font-bold text-slate-300">{member.name}</span>
                                 </div>
