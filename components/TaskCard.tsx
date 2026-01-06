@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Task, TaskStatus, TaskPriority, User } from '../types';
 
@@ -51,6 +50,16 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
   const formatTime = (timestamp?: number) => {
     if (!timestamp) return '-';
     return new Date(timestamp).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const formatDateTime = (timestamp?: number) => {
+      if (!timestamp) return '-';
+      const date = new Date(timestamp);
+      const isToday = new Date().toDateString() === date.toDateString();
+      const timeStr = date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+      
+      if (isToday) return `Bugün ${timeStr}`;
+      return `${date.toLocaleDateString('tr-TR', { day:'numeric', month:'numeric' })} ${timeStr}`;
   };
 
   const calculateDuration = () => {
@@ -141,20 +150,21 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
   const currentPriority = priorityConfig[task.priority];
 
   const renderSeenStatus = () => {
+    // Sadece amirler görebilir
     if (user.role !== 'AMIR' && !isArchived) return null;
 
     if (task.seenAt) {
         return (
-            <span className="text-[10px] font-bold text-blue-400 bg-blue-900/10 px-1.5 py-0.5 rounded flex items-center gap-1 mt-1 border border-blue-900/30 animate-in fade-in">
-                <i className="fas fa-eye text-[9px]"></i> 
-                {formatTime(task.seenAt)}
+            <span className="text-[10px] font-bold text-blue-400 bg-blue-900/20 px-2 py-1 rounded flex items-center gap-1.5 border border-blue-900/30 animate-in fade-in whitespace-nowrap">
+                <i className="fas fa-eye text-[10px]"></i> 
+                Görüldü: {formatDateTime(task.seenAt)}
             </span>
         );
     } else {
         return (
-            <span className="text-[10px] font-bold text-slate-600 bg-slate-700/20 px-1.5 py-0.5 rounded flex items-center gap-1 mt-1 border border-slate-700/30">
-                <i className="fas fa-eye-slash text-[9px]"></i> 
-                Görülmedi
+            <span className="text-[10px] font-bold text-slate-500 bg-slate-700/20 px-2 py-1 rounded flex items-center gap-1.5 border border-slate-700/30 whitespace-nowrap">
+                <i className="fas fa-eye-slash text-[10px]"></i> 
+                Henüz Görülmedi
             </span>
         );
     }
@@ -253,7 +263,10 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
                         <span className="text-[9px] font-bold text-red-500 mt-1">
                              Silindi: {new Date(task.deletedAt).toLocaleDateString('tr-TR')}
                         </span>
-                    ) : renderSeenStatus()}
+                    ) : (
+                        // Collapsed modda görüldü bilgisi
+                        <div className="mt-1">{renderSeenStatus()}</div>
+                    )}
                   </div>
               </div>
           )}
@@ -262,6 +275,13 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onUpdateStatus, onDelet
         {/* Genişletilmiş İçerik */}
         {!isCollapsed && (
           <div className="pl-5 pr-4 pb-5 animate-in slide-in-from-top-2 duration-300 bg-slate-800">
+            {/* Expanded modda görüldü bilgisi (En üstte) */}
+             {user.role === 'AMIR' && !isArchived && (
+                 <div className="flex justify-end mb-3">
+                     {renderSeenStatus()}
+                 </div>
+             )}
+
             <div className="bg-slate-900/50 p-4 rounded-xl text-sm text-slate-300 mb-4 border border-slate-700 leading-relaxed shadow-inner">
                <h4 className="text-[10px] font-bold text-slate-500 uppercase mb-1">İş Emri Açıklaması</h4>
               {task.description}

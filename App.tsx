@@ -1813,8 +1813,20 @@ const App: React.FC = () => {
                                     {member.phoneNumber && <span className="text-[9px] text-slate-500 block"><i className="fab fa-whatsapp"></i> {member.phoneNumber}</span>}
                                 </div>
                             </div>
+                            
+                            {/* KONUM GÖRÜNTÜLEME BUTONU */}
+                            {member.latitude && member.longitude && (
+                                <a 
+                                  href={`https://www.google.com/maps/search/?api=1&query=${member.latitude},${member.longitude}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="ml-auto mr-2 px-2 py-1 bg-blue-900/20 text-blue-400 border border-blue-900/30 rounded text-[9px] font-bold hover:bg-blue-900/40 flex items-center gap-1"
+                                >
+                                    <i className="fas fa-map-marker-alt"></i> Konum
+                                </a>
+                            )}
 
-                             {/* Sadece Amirler Butonları Görür */}
+                             {/* Sadece Amirler Düzenleme Butonlarını Görür */}
                             {currentUser.role === 'AMIR' && (
                                 <div className="flex items-center gap-2">
                                     <button onClick={() => { setRenameModal({show: true, oldName: member.name, role: 'USTA'}); setRenameInput(member.name); }} className="text-slate-500 hover:text-blue-400 transition-colors">

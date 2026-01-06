@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { LeaveRequest, RequestStatus, User } from '../types';
 
@@ -31,10 +30,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ leaves, user, onAddLeave, o
     return day === 0 ? 6 : day - 1; // Pazar(0) -> 6, Pzt(1) -> 0
   };
 
-  const formatDate = (date: Date) => {
-    return date.toISOString().split('T')[0];
-  };
-
   const changeMonth = (offset: number) => {
     const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + offset, 1);
     setCurrentDate(newDate);
@@ -58,6 +53,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ leaves, user, onAddLeave, o
       const dateStr = `${year}-${month}-${d}`;
       
       setSelectedDate(dateStr);
+
+      // Eğer kullanıcı Usta ise ve bir güne tıkladıysa, o gün için izin penceresini otomatik aç
+      if (user.role === 'USTA') {
+          setStartInput(dateStr);
+          setEndInput(dateStr);
+          setShowAddModal(true);
+      }
   };
 
   const handleCreateSubmit = (e: React.FormEvent) => {
@@ -127,7 +129,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ leaves, user, onAddLeave, o
           <h2 className="text-2xl font-black text-slate-100">İzin Takvimi</h2>
           {user.role === 'USTA' && (
               <button 
-                onClick={() => setShowAddModal(true)}
+                onClick={() => {
+                    // Butona basınca bugünü varsayılan yap
+                    const today = new Date().toISOString().split('T')[0];
+                    setStartInput(today);
+                    setEndInput(today);
+                    setShowAddModal(true);
+                }}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-blue-900/30 flex items-center gap-2"
               >
                   <i className="fas fa-plus"></i> İzin İste
