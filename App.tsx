@@ -30,6 +30,7 @@ const App: React.FC = () => {
 
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const taskImageInputRef = useRef<HTMLInputElement>(null);
 
   // Forms
   const [newRequestContent, setNewRequestContent] = useState('');
@@ -39,6 +40,7 @@ const App: React.FC = () => {
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskMaster, setNewTaskMaster] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
+  const [newTaskImage, setNewTaskImage] = useState<string | undefined>(undefined);
 
   // Personnel Management
   const [renameModal, setRenameModal] = useState<{show: boolean, oldName: string, role: 'AMIR'|'USTA'} | null>(null);
@@ -143,7 +145,6 @@ const App: React.FC = () => {
       reader.onloadend = async () => {
           const base64String = reader.result as string;
           
-          // Profil fotoğrafı büyük veri olduğu için anında yerelde güncelle
           let updatedAmirs = amirs;
           let updatedUstas = ustas;
 
@@ -157,11 +158,20 @@ const App: React.FC = () => {
           
           setCurrentUser({ ...currentUser, avatar: base64String });
           
-          // Profil fotoğrafı kritik olduğu için DEBOUNCE BEKLEME, ANINDA KAYDET
           setIsSaving(true);
           await saveAppData({ tasks, requests, leaves, amirs: updatedAmirs, ustas: updatedUstas, deletedTasks }, binId);
           setIsSaving(false);
           setIsDirty(false);
+      };
+      reader.readAsDataURL(file);
+  };
+
+  const handleTaskImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onloadend = () => {
+          setNewTaskImage(reader.result as string);
       };
       reader.readAsDataURL(file);
   };
@@ -209,13 +219,15 @@ const App: React.FC = () => {
           description: newTaskDescription,
           status: TaskStatus.PENDING,
           priority: newTaskPriority,
-          createdAt: Date.now()
+          createdAt: Date.now(),
+          image: newTaskImage
       };
 
       setTasks([newTask, ...tasks]);
       setNewTaskMachine('');
       setNewTaskDescription('');
       setNewTaskMaster('');
+      setNewTaskImage(undefined);
       setActiveTab('tasks');
       setIsDirty(true);
   };
@@ -260,12 +272,15 @@ const App: React.FC = () => {
       setTasks(tasks.map(t => t.id === taskId ? { ...t, seenAt: Date.now() } : t));
       setIsDirty(true);
   };
-  const handleTaskStatusChange = (taskId: string, status: TaskStatus) => {
+  const handleTaskStatusChange = (taskId: string, status: TaskStatus, completedImage?: string) => {
       setTasks(tasks.map(t => {
           if (t.id !== taskId) return t;
           const updates: Partial<Task> = { status };
           if (status === TaskStatus.IN_PROGRESS) updates.startedAt = Date.now();
-          if (status === TaskStatus.COMPLETED) updates.completedAt = Date.now();
+          if (status === TaskStatus.COMPLETED) {
+              updates.completedAt = Date.now();
+              if (completedImage) updates.completedImage = completedImage;
+          }
           return { ...t, ...updates };
       }));
       setIsDirty(true);
@@ -642,6 +657,34 @@ const App: React.FC = () => {
                             value={newTaskDescription}
                             onChange={e => setNewTaskDescription(e.target.value)}
                         ></textarea>
+                    </div>
+
+                    {/* Task Image Upload */}
+                    <div>
+                        <label className="block text-xs font-bold text-blue-400 uppercase mb-2 pl-1">Fotoğraf Ekle (Opsiyonel)</label>
+                        <input type="file" ref={taskImageInputRef} onChange={handleTaskImageUpload} accept="image/*" className="hidden" />
+                        <div className="flex items-center gap-4">
+                            <button 
+                                type="button" 
+                                onClick={() => taskImageInputRef.current?.click()}
+                                className="bg-slate-900/50 border border-slate-700 border-dashed rounded-xl p-4 text-slate-500 hover:border-blue-500 hover:text-blue-500 transition-all flex flex-col items-center justify-center gap-2"
+                            >
+                                <i className="fas fa-camera text-xl"></i>
+                                <span className="text-[10px] font-bold">Resim Seç</span>
+                            </button>
+                            {newTaskImage && (
+                                <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-white/10 group">
+                                    <img src={newTaskImage} className="w-full h-full object-cover" />
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setNewTaskImage(undefined)}
+                                        className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity"
+                                    >
+                                        <i className="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <button 
