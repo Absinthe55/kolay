@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Layout from './components/Layout';
 import TaskCard from './components/TaskCard';
 import CalendarView from './components/CalendarView';
 import { Task, User, AppTab, Member, UstaRequest, LeaveRequest, RequestStatus, TaskPriority, TaskStatus } from './types';
-import { fetchAppData, saveAppData, createNewBin, checkConnection, extractBinId, getStoredBinId, setStoredBinId } from './services/dbService';
+import { fetchAppData, saveAppData, createNewBin, checkConnection, extractBinId, getStoredBinId, setStoredBinId, AppData } from './services/dbService';
 
 // Otomatik bağlanılacak demo ID
 const AUTO_CONNECT_ID = 'demo_kanal_v1';
@@ -22,10 +22,11 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('tasks');
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [binId, setBinId] = useState('');
   
   // Sync State
-  const [isDirty, setIsDirty] = useState(false); // Yerel değişiklik var mı?
+  const [isDirty, setIsDirty] = useState(false); 
 
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -90,7 +91,6 @@ const App: React.FC = () => {
           setUstas(data.ustas);
           setDeletedTasks(data.deletedTasks);
           
-          // Profil fotoğrafı vs. güncellenmişse oturumu güncelle
           if (currentUser) {
               const allMembers = [...data.amirs, ...data.ustas];
               const updatedMe = allMembers.find(m => m.name === currentUser.name);
@@ -107,26 +107,31 @@ const App: React.FC = () => {
       if (!binId || connectionStatus !== 'connected') return;
 
       const interval = setInterval(() => {
-          if (!isDirty) {
+          if (!isDirty && !isSaving) {
               loadData(binId);
           }
       }, 1000);
 
       return () => clearInterval(interval);
-  }, [binId, connectionStatus, isDirty]);
+  }, [binId, connectionStatus, isDirty, isSaving]);
 
-  const saveAll = async () => {
+  // Kayıt Fonksiyonu
+  const triggerSave = useCallback(async () => {
       if (!binId) return;
-      await saveAppData({ tasks, requests, leaves, amirs, ustas, deletedTasks }, binId);
-      setIsDirty(false);
-  };
-  
+      setIsSaving(true);
+      const dataToSave = { tasks, requests, leaves, amirs, ustas, deletedTasks };
+      const success = await saveAppData(dataToSave, binId);
+      if (success) setIsDirty(false);
+      setIsSaving(false);
+  }, [binId, tasks, requests, leaves, amirs, ustas, deletedTasks]);
+
+  // Debounced Auto-Save
   useEffect(() => {
       if(currentUser && binId && isDirty) {
-          const timer = setTimeout(saveAll, 1000);
+          const timer = setTimeout(triggerSave, 1500);
           return () => clearTimeout(timer);
       }
-  }, [tasks, requests, leaves, amirs, ustas, deletedTasks, isDirty]);
+  }, [isDirty, triggerSave]);
 
   // --- ACTIONS ---
 
@@ -135,18 +140,28 @@ const App: React.FC = () => {
       if (!file || !currentUser) return;
 
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
           const base64String = reader.result as string;
           
-          // Hem listeleri hem de mevcut kullanıcıyı güncelle
+          // Profil fotoğrafı büyük veri olduğu için anında yerelde güncelle
+          let updatedAmirs = amirs;
+          let updatedUstas = ustas;
+
           if (currentUser.role === 'AMIR') {
-              setAmirs(amirs.map(m => m.name === currentUser.name ? { ...m, avatar: base64String } : m));
+              updatedAmirs = amirs.map(m => m.name === currentUser.name ? { ...m, avatar: base64String } : m);
+              setAmirs(updatedAmirs);
           } else {
-              setUstas(ustas.map(m => m.name === currentUser.name ? { ...m, avatar: base64String } : m));
+              updatedUstas = ustas.map(m => m.name === currentUser.name ? { ...m, avatar: base64String } : m);
+              setUstas(updatedUstas);
           }
           
           setCurrentUser({ ...currentUser, avatar: base64String });
-          setIsDirty(true);
+          
+          // Profil fotoğrafı kritik olduğu için DEBOUNCE BEKLEME, ANINDA KAYDET
+          setIsSaving(true);
+          await saveAppData({ tasks, requests, leaves, amirs: updatedAmirs, ustas: updatedUstas, deletedTasks }, binId);
+          setIsSaving(false);
+          setIsDirty(false);
       };
       reader.readAsDataURL(file);
   };
@@ -514,6 +529,14 @@ const App: React.FC = () => {
             accept="image/*" 
             className="hidden" 
         />
+
+        {/* Global Saving Indicator */}
+        {isSaving && (
+            <div className="fixed top-4 right-4 z-[100] bg-slate-900/80 backdrop-blur border border-blue-500/30 px-3 py-1.5 rounded-full flex items-center gap-2 shadow-xl animate-in fade-in slide-in-from-top-2">
+                <i className="fas fa-circle-notch fa-spin text-blue-500 text-xs"></i>
+                <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Kaydediliyor</span>
+            </div>
+        )}
 
         {/* TAB: TASKS */}
         {activeTab === 'tasks' && (

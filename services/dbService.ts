@@ -57,8 +57,6 @@ export const checkConnection = async (id: string): Promise<boolean> => {
     if (!id) return false;
     try {
         const response = await fetch(`${API_BASE}/${id}.json`);
-        // Firebase null dönerse veri yok demektir ama bağlantı var demektir. 
-        // 404 dönmez, null döner. Erişim varsa true dönelim.
         return response.ok;
     } catch {
         return false;
@@ -76,12 +74,12 @@ const normalizeMembers = (data: any[]): Member[] => {
     });
 };
 
-// Rastgele ID oluşturucu (Firebase push ID benzeri ama basit)
+// Rastgele ID oluşturucu
 const generateId = () => {
     return 'bin_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
 };
 
-// Yeni bir alan oluşturur (Firebase PUT request)
+// Yeni bir alan oluşturur
 export const createNewBin = async (defaultAmirs: Member[], defaultUstas: Member[]): Promise<string | null> => {
   try {
     const newId = generateId();
@@ -95,7 +93,6 @@ export const createNewBin = async (defaultAmirs: Member[], defaultUstas: Member[
       updatedAt: Date.now()
     };
     
-    // Firebase'de belirli bir ID'ye PUT yaparak veriyi yazarız
     const response = await fetch(`${API_BASE}/${newId}.json`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -115,53 +112,38 @@ export const createNewBin = async (defaultAmirs: Member[], defaultUstas: Member[
 // Tüm verileri çeker
 export const fetchAppData = async (binId?: string): Promise<AppData> => {
   const id = binId || getStoredBinId();
-  
-  // Varsayılan boş yapı
   const emptyData: AppData = { tasks: [], requests: [], leaves: [], amirs: [], ustas: [], deletedTasks: [], updatedAt: 0 };
-
-  if (!id) {
-    // ID yoksa localden okumayı dene
-    const localDataStr = localStorage.getItem(LOCAL_KEY_DATA);
-    if (localDataStr) {
-       try {
-           const parsed = JSON.parse(localDataStr);
-           return { ...emptyData, ...parsed };
-       } catch { return emptyData; }
-    }
-    return emptyData;
+  
+  // Local veriyi alalım (Karşılaştırma için)
+  const localDataStr = localStorage.getItem(LOCAL_KEY_DATA);
+  let localData: AppData | null = null;
+  if (localDataStr) {
+      try { localData = JSON.parse(localDataStr); } catch (e) {}
   }
+
+  if (!id) return localData || emptyData;
   
   try {
-    // Firebase GET request
     const response = await fetch(`${API_BASE}/${id}.json`);
 
     if (response.ok) {
       const data = await response.json();
-      
-      // Veri yoksa (yeni ID veya silinmiş)
-      if (!data) return emptyData;
+      if (!data) return localData || emptyData;
 
-      let tasks: Task[] = [];
-      let requests: UstaRequest[] = [];
-      let leaves: LeaveRequest[] = [];
-      let amirs: Member[] = [];
-      let ustas: Member[] = [];
-      let deletedTasks: Task[] = [];
+      // ÇOK KRİTİK: Eğer sunucudaki veri, yerel veriden daha eski ise yerel veriyi koru
+      // Bu, kayıt işlemi devam ederken sayfa yenilendiğinde eski verinin gelmesini engeller
+      if (localData && data.updatedAt && data.updatedAt < localData.updatedAt) {
+          console.log("Sunucudaki veri eski, yerel veri korunuyor.");
+          return localData;
+      }
 
-      tasks = Array.isArray(data.tasks) ? data.tasks : [];
-      requests = Array.isArray(data.requests) ? data.requests : [];
-      leaves = Array.isArray(data.leaves) ? data.leaves : [];
-      amirs = normalizeMembers(data.amirs || []);
-      ustas = normalizeMembers(data.ustas || []);
-      deletedTasks = Array.isArray(data.deletedTasks) ? data.deletedTasks : [];
-      
       const normalizedData: AppData = { 
-          tasks, 
-          requests, 
-          leaves, 
-          amirs, 
-          ustas, 
-          deletedTasks, 
+          tasks: Array.isArray(data.tasks) ? data.tasks : [], 
+          requests: Array.isArray(data.requests) ? data.requests : [], 
+          leaves: Array.isArray(data.leaves) ? data.leaves : [], 
+          amirs: normalizeMembers(data.amirs || []), 
+          ustas: normalizeMembers(data.ustas || []), 
+          deletedTasks: Array.isArray(data.deletedTasks) ? data.deletedTasks : [], 
           updatedAt: data.updatedAt || Date.now() 
       };
       
@@ -172,23 +154,15 @@ export const fetchAppData = async (binId?: string): Promise<AppData> => {
     console.warn("Firebase veri çekme hatası:", e);
   }
   
-  // Hata durumunda local veriyi dön
-  const local = localStorage.getItem(LOCAL_KEY_DATA);
-  if (local) {
-      try {
-        const parsed = JSON.parse(local);
-        return { ...emptyData, ...parsed };
-      } catch { return emptyData; }
-  }
-  return emptyData;
+  return localData || emptyData;
 };
 
-// Tüm veriyi kaydeder (Firebase PUT request - Tam üzerine yazma)
+// Tüm veriyi kaydeder
 export const saveAppData = async (data: Omit<AppData, 'updatedAt'>, binId?: string): Promise<boolean> => {
   const id = binId || getStoredBinId();
   const payload = { ...data, updatedAt: Date.now() };
   
-  // Local storage her zaman güncel kalsın
+  // Önce local storage'a yaz ki veri kaybolmasın
   localStorage.setItem(LOCAL_KEY_DATA, JSON.stringify(payload));
 
   if (!id) return true;
