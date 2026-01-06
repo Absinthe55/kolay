@@ -1,14 +1,13 @@
-
 import { Task, Member, UstaRequest, LeaveRequest } from '../types';
 
-// NPOINT.IO AYARLARI
-const API_BASE = 'https://api.npoint.io';
+// FIREBASE REALTIME DATABASE AYARLARI
+const API_BASE = 'https://websitem-41bb4-default-rtdb.europe-west1.firebasedatabase.app';
 
 const LOCAL_KEY_ID = 'hidro_bin_id';
 const LOCAL_KEY_DATA = 'hidro_data';
 
-// Demo ID (Kullanıcının verdiği sabit npoint ID'si)
-const DEMO_ID = 'c85115e1d1b4c3276a86';
+// Demo ID (Varsayılan test kanalı)
+const DEMO_ID = 'demo_kanal_v1';
 
 export interface AppData {
   tasks: Task[];
@@ -28,27 +27,38 @@ export const setStoredBinId = (id: string) => {
   localStorage.setItem(LOCAL_KEY_ID, id.trim());
 };
 
-// URL'den veya metinden NPOINT ID'yi ayıklar
+// URL'den veya metinden ID'yi ayıklar
 export const extractBinId = (input: string): string => {
   let text = input.trim();
-  // URL temizleme
-  if (text.includes('/')) {
+  
+  // Önce yaygın uzantıları temizle
+  text = text.replace(/\.json$/, ''); // Sonda .json varsa sil
+  if (text.endsWith('/')) text = text.slice(0, -1); // Sonda slash varsa sil
+
+  // Firebase URL kontrolü
+  if (text.includes('firebasedatabase.app')) {
       const parts = text.split('/');
-      // npoint.io/docs/ID veya api.npoint.io/ID
-      text = parts[parts.length - 1];
+      const lastPart = parts[parts.length - 1];
+      // Eğer ana domaini yapıştırdıysa (id yoksa) boş dön
+      if (lastPart.includes('firebasedatabase.app')) return '';
+      return lastPart;
+  } 
+  // Başka bir URL ise (örn: eski npoint linkleri veya genel linkler)
+  else if (text.includes('/')) {
+      const parts = text.split('/');
+      return parts[parts.length - 1];
   }
+  
   return text;
 };
 
-// Sadece bağlantı testi yapar (npoint API üzerinden)
+// Sadece bağlantı testi yapar (ID boş mu dolu mu kontrol eder)
 export const checkConnection = async (id: string): Promise<boolean> => {
     if (!id) return false;
     try {
-        // Cache busting için rastgele parametre
-        const response = await fetch(`${API_BASE}/${id}?t=${Date.now()}`, {
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-        });
+        const response = await fetch(`${API_BASE}/${id}.json`);
+        // Firebase null dönerse veri yok demektir ama bağlantı var demektir. 
+        // 404 dönmez, null döner. Erişim varsa true dönelim.
         return response.ok;
     } catch {
         return false;
@@ -66,9 +76,15 @@ const normalizeMembers = (data: any[]): Member[] => {
     });
 };
 
-// Yeni bir alan oluşturur (npoint üzerinden)
+// Rastgele ID oluşturucu (Firebase push ID benzeri ama basit)
+const generateId = () => {
+    return 'bin_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+};
+
+// Yeni bir alan oluşturur (Firebase PUT request)
 export const createNewBin = async (defaultAmirs: Member[], defaultUstas: Member[]): Promise<string | null> => {
   try {
+    const newId = generateId();
     const initialData: AppData = {
       tasks: [],
       requests: [],
@@ -79,25 +95,24 @@ export const createNewBin = async (defaultAmirs: Member[], defaultUstas: Member[
       updatedAt: Date.now()
     };
     
-    // npoint.io yeni bin oluşturma (POST request to root)
-    const response = await fetch(API_BASE, {
-      method: 'POST',
+    // Firebase'de belirli bir ID'ye PUT yaparak veriyi yazarız
+    const response = await fetch(`${API_BASE}/${newId}.json`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(initialData)
     });
     
     if (response.ok) {
-      const data = await response.json();
-      return data.id; // npoint returns { "id": "..." }
+      return newId;
     }
     return null;
   } catch (e) {
-    console.error("Bin oluşturma hatası:", e);
+    console.error("Grup oluşturma hatası:", e);
     return null;
   }
 };
 
-// Tüm verileri (Görevler + Personel Listesi) çeker
+// Tüm verileri çeker
 export const fetchAppData = async (binId?: string): Promise<AppData> => {
   const id = binId || getStoredBinId();
   
@@ -105,40 +120,27 @@ export const fetchAppData = async (binId?: string): Promise<AppData> => {
   const emptyData: AppData = { tasks: [], requests: [], leaves: [], amirs: [], ustas: [], deletedTasks: [], updatedAt: 0 };
 
   if (!id) {
+    // ID yoksa localden okumayı dene
     const localDataStr = localStorage.getItem(LOCAL_KEY_DATA);
     if (localDataStr) {
        try {
            const parsed = JSON.parse(localDataStr);
-           return { 
-               ...emptyData, 
-               ...parsed,
-               requests: Array.isArray(parsed.requests) ? parsed.requests : [],
-               leaves: Array.isArray(parsed.leaves) ? parsed.leaves : [],
-               amirs: normalizeMembers(parsed.amirs),
-               ustas: normalizeMembers(parsed.ustas),
-               deletedTasks: Array.isArray(parsed.deletedTasks) ? parsed.deletedTasks : []
-           };
-       } catch {
-           return emptyData;
-       }
+           return { ...emptyData, ...parsed };
+       } catch { return emptyData; }
     }
     return emptyData;
   }
   
   try {
-    // ÖNEMLİ: ?t=... parametresi ve no-store header'ı ile önbelleği zorla atlatıyoruz
-    const response = await fetch(`${API_BASE}/${id}?nocache=${Date.now()}`, {
-        cache: 'no-store',
-        headers: { 
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-        }
-    });
+    // Firebase GET request
+    const response = await fetch(`${API_BASE}/${id}.json`);
 
     if (response.ok) {
       const data = await response.json();
       
+      // Veri yoksa (yeni ID veya silinmiş)
+      if (!data) return emptyData;
+
       let tasks: Task[] = [];
       let requests: UstaRequest[] = [];
       let leaves: LeaveRequest[] = [];
@@ -146,17 +148,12 @@ export const fetchAppData = async (binId?: string): Promise<AppData> => {
       let ustas: Member[] = [];
       let deletedTasks: Task[] = [];
 
-      // Eski veri yapısı kontrolü (array mi obje mi)
-      if (Array.isArray(data)) {
-        tasks = data;
-      } else {
-        tasks = Array.isArray(data.tasks) ? data.tasks : [];
-        requests = Array.isArray(data.requests) ? data.requests : [];
-        leaves = Array.isArray(data.leaves) ? data.leaves : [];
-        amirs = normalizeMembers(data.amirs);
-        ustas = normalizeMembers(data.ustas);
-        deletedTasks = Array.isArray(data.deletedTasks) ? data.deletedTasks : [];
-      }
+      tasks = Array.isArray(data.tasks) ? data.tasks : [];
+      requests = Array.isArray(data.requests) ? data.requests : [];
+      leaves = Array.isArray(data.leaves) ? data.leaves : [];
+      amirs = normalizeMembers(data.amirs || []);
+      ustas = normalizeMembers(data.ustas || []);
+      deletedTasks = Array.isArray(data.deletedTasks) ? data.deletedTasks : [];
       
       const normalizedData: AppData = { 
           tasks, 
@@ -172,7 +169,7 @@ export const fetchAppData = async (binId?: string): Promise<AppData> => {
       return normalizedData;
     }
   } catch (e) {
-    console.warn("Veri çekme hatası:", e);
+    console.warn("Firebase veri çekme hatası:", e);
   }
   
   // Hata durumunda local veriyi dön
@@ -180,23 +177,13 @@ export const fetchAppData = async (binId?: string): Promise<AppData> => {
   if (local) {
       try {
         const parsed = JSON.parse(local);
-        return { 
-            ...emptyData, 
-            ...parsed,
-            requests: Array.isArray(parsed.requests) ? parsed.requests : [],
-            leaves: Array.isArray(parsed.leaves) ? parsed.leaves : [],
-            amirs: normalizeMembers(parsed.amirs),
-            ustas: normalizeMembers(parsed.ustas),
-            deletedTasks: Array.isArray(parsed.deletedTasks) ? parsed.deletedTasks : []
-        };
-      } catch {
-          return emptyData;
-      }
+        return { ...emptyData, ...parsed };
+      } catch { return emptyData; }
   }
   return emptyData;
 };
 
-// Tüm veriyi kaydeder (npoint API POST request)
+// Tüm veriyi kaydeder (Firebase PUT request - Tam üzerine yazma)
 export const saveAppData = async (data: Omit<AppData, 'updatedAt'>, binId?: string): Promise<boolean> => {
   const id = binId || getStoredBinId();
   const payload = { ...data, updatedAt: Date.now() };
@@ -207,23 +194,15 @@ export const saveAppData = async (data: Omit<AppData, 'updatedAt'>, binId?: stri
   if (!id) return true;
 
   try {
-    // 1. Önce sunucuya veriyi gönder
-    const response = await fetch(`${API_BASE}/${id}`, {
-      method: 'POST',
+    const response = await fetch(`${API_BASE}/${id}.json`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
-    // 2. Npoint bazen dağıtımı geciktirebilir, 250ms bekleyelim
-    if (response.ok) {
-        await new Promise(resolve => setTimeout(resolve, 250));
-        return true;
-    }
-    return false;
+    return response.ok;
   } catch (e) {
-    console.error("Kayıt hatası:", e);
-    // Hata durumunda, kullanıcının interneti olmayabilir ama local'e kaydettik.
-    // Kullanıcıya hissettirmemek için false dönüyoruz ama veri localde güvende.
+    console.error("Firebase kayıt hatası:", e);
     return false;
   }
 };

@@ -9,8 +9,9 @@ import CalendarView from './components/CalendarView';
 const DEFAULT_AMIRS: Member[] = [];
 const DEFAULT_USTAS: Member[] = [];
 
-// Otomatik bağlanılacak NPOINT adresi
-const AUTO_CONNECT_URL = 'https://www.npoint.io/docs/c85115e1d1b4c3276a86';
+// Otomatik bağlanılacak demo ID (Firebase üzerinde)
+const AUTO_CONNECT_ID = 'demo_kanal_v1';
+
 // Yerel depolamada yetkilendirme anahtarı
 const LOCAL_KEY_AUTH = 'hidro_auth';
 // Bildirim sesi (Kısa bip sesi)
@@ -399,7 +400,8 @@ const App: React.FC = () => {
     const initAutoConnect = async () => {
        const currentId = getStoredBinId();
        if (!currentId) {
-          const autoId = extractBinId(AUTO_CONNECT_URL);
+          const autoId = AUTO_CONNECT_ID;
+          // Demo ID kontrolü
           const isValid = await checkConnection(autoId);
           if (isValid) {
              setStoredBinId(autoId);
@@ -515,6 +517,29 @@ const App: React.FC = () => {
     setPullStartY(0);
   };
 
+  // SİSTEMİ BAŞLATMA FONKSİYONU (YENİ)
+  const handleInitializeSystem = async () => {
+      setLoading(true);
+      const defaultAmir: Member = { 
+          name: 'Birim Amiri', 
+          avatar: 'https://cdn-icons-png.flaticon.com/512/2304/2304226.png',
+          lastActive: Date.now()
+      };
+      
+      const initialData = {
+          tasks: [],
+          requests: [],
+          leaves: [],
+          amirs: [defaultAmir],
+          ustas: [],
+          deletedTasks: []
+      };
+
+      await saveAppData(initialData, connectionId);
+      await loadData();
+      setLoading(false);
+  };
+
   const handleLoginClick = (member: Member, role: 'AMIR' | 'USTA') => {
       if (member.password && member.password.trim() !== '') {
           setLoginModal({ show: true, member, role });
@@ -581,7 +606,7 @@ const App: React.FC = () => {
     } else {
       const manualInput = prompt(
         "⚠ OTOMATİK OLUŞTURULAMADI\n\n" +
-        "Lütfen 'npoint.io' sitesinden aldığınız kodu (veya linki) yapıştırın:"
+        "Lütfen Firebase ID'nizi veya bağlantı kodunu girin:"
       );
 
       if (manualInput && manualInput.trim().length > 1) {
@@ -596,7 +621,7 @@ const App: React.FC = () => {
             alert("✅ BAŞARILI! Bağlantı sağlandı.");
         } else {
             setLoading(false);
-            alert("❌ BAĞLANTI HATASI!");
+            alert("❌ BAĞLANTI HATASI! Veri bulunamadı veya erişim yok.");
         }
       }
     }
@@ -1123,86 +1148,124 @@ const App: React.FC = () => {
           </div>
           
           <div className="space-y-6 bg-white/5 backdrop-blur-lg p-6 rounded-3xl border border-white/10 shadow-2xl">
-            {/* Login bölümleri... */}
-            <section>
-              <div className="flex items-center gap-2 mb-3">
-                 <div className="w-1 h-4 bg-blue-500 rounded-full"></div>
-                 <h2 className="text-xs font-bold text-blue-200 uppercase tracking-widest">Yönetim</h2>
-              </div>
-              <div className="grid grid-cols-1 gap-2">
-                {amirList.length === 0 && <p className="text-xs text-slate-500 italic p-2">Liste boş, senkronizasyon bekleniyor...</p>}
-                {amirList.map(member => (
-                  <button key={member.name} onClick={() => handleLoginClick(member, 'AMIR')} className="group relative bg-slate-800/50 hover:bg-blue-600 border border-white/5 p-4 rounded-2xl text-left font-bold transition-all duration-300 flex justify-between items-center overflow-hidden">
-                    <div className="absolute inset-0 bg-blue-400/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
-                    <div className="text-slate-200 group-hover:text-white relative z-10 flex items-center gap-3">
-                        <div className="relative flex-shrink-0">
-                            {member.avatar ? (
-                                <img src={member.avatar} className="w-6 h-6 rounded-full object-cover border border-slate-600" />
-                            ) : (
-                                <i className="fas fa-user-tie text-blue-400 group-hover:text-white/80"></i>
-                            )}
-                            {isUserOnline(member.lastActive) && (
-                                <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-green-500 border-2 border-slate-800 rounded-full"></span>
-                            )}
-                        </div>
-                        <div className="flex flex-col items-start min-w-0">
-                            <span className="flex items-center gap-2 truncate">
-                                {member.name}
-                                {member.password && <i className="fas fa-lock text-[10px] text-slate-500 group-hover:text-white/50"></i>}
-                            </span>
-                            {member.lastActive && (
-                                <span className="text-[10px] font-normal text-slate-400 group-hover:text-blue-200 truncate">
-                                     {formatLastActive(member.lastActive)}
-                                </span>
-                            )}
-                        </div>
+            {/* BOŞ VERİTABANI DURUMU - YENİ ÖZELLİK */}
+            {!loading && amirList.length === 0 && ustaList.length === 0 && (
+                <div className="bg-blue-600/20 border border-blue-500/30 p-5 rounded-2xl text-center mb-6 animate-in fade-in zoom-in shadow-lg">
+                    <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                         <i className="fas fa-rocket text-blue-400 text-xl"></i>
                     </div>
-                    <i className="fas fa-arrow-right text-slate-600 group-hover:text-white relative z-10 opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0 ml-auto"></i>
-                  </button>
-                ))}
-              </div>
-            </section>
-            
-            <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+                    <h3 className="font-bold text-white mb-1">Veritabanı Boş</h3>
+                    <p className="text-xs text-blue-200 mb-4 px-4">
+                        Bağlı olduğunuz veritabanında henüz kullanıcı bulunmuyor. Sistemi başlatmak için varsayılan yöneticiyi oluşturun.
+                    </p>
+                    <button 
+                        onClick={handleInitializeSystem}
+                        className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg shadow-blue-900/50 w-full transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                        <i className="fas fa-power-off"></i>
+                        Sistemi Başlat
+                    </button>
+                    
+                    <div className="mt-4 pt-3 border-t border-white/5">
+                         <p className="text-[10px] text-slate-500 mb-2">veya farklı bir kanala geçin:</p>
+                         <button 
+                            onClick={() => { 
+                                if(confirm("Mevcut bağlantıdan ayrılmak istiyor musunuz?")) {
+                                    setConnectionId(''); 
+                                    setStoredBinId(''); 
+                                    window.location.reload(); 
+                                }
+                            }} 
+                            className="text-xs font-bold text-slate-400 hover:text-white underline"
+                         >
+                             Bağlantıyı Kes
+                         </button>
+                    </div>
+                </div>
+            )}
 
-            <section>
-              <div className="flex items-center gap-2 mb-3">
-                 <div className="w-1 h-4 bg-emerald-500 rounded-full"></div>
-                 <h2 className="text-xs font-bold text-emerald-200 uppercase tracking-widest">Saha Ekibi</h2>
-              </div>
-              <div className="grid grid-cols-1 gap-2">
-                {ustaList.length === 0 && <p className="text-xs text-slate-500 italic p-2">Liste boş, senkronizasyon bekleniyor...</p>}
-                {ustaList.map(member => (
-                  <button key={member.name} onClick={() => handleLoginClick(member, 'USTA')} className="group relative bg-slate-800/50 hover:bg-emerald-600 border border-white/5 p-4 rounded-2xl text-left font-bold transition-all duration-300 flex justify-between items-center overflow-hidden">
-                    <div className="absolute inset-0 bg-emerald-400/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
-                    <div className="text-slate-200 group-hover:text-white relative z-10 flex items-center gap-3">
-                        <div className="relative flex-shrink-0">
-                            {member.avatar ? (
-                                <img src={member.avatar} className="w-6 h-6 rounded-full object-cover border border-slate-600" />
-                            ) : (
-                                <i className="fas fa-wrench text-emerald-400 group-hover:text-white/80"></i>
-                            )}
-                            {isUserOnline(member.lastActive) && (
-                                <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-green-500 border-2 border-slate-800 rounded-full"></span>
-                            )}
-                        </div>
-                        <div className="flex flex-col items-start min-w-0">
-                            <span className="flex items-center gap-2 truncate">
-                                {member.name}
-                                {member.password && <i className="fas fa-lock text-[10px] text-slate-500 group-hover:text-white/50"></i>}
-                            </span>
-                            {member.lastActive && (
-                                <span className="text-[10px] font-normal text-slate-400 group-hover:text-emerald-200 truncate">
-                                     {formatLastActive(member.lastActive)}
+            {/* Login bölümleri... Eğer liste doluysa göster */}
+            {(amirList.length > 0 || ustaList.length > 0) && (
+              <>
+                <section>
+                  <div className="flex items-center gap-2 mb-3">
+                     <div className="w-1 h-4 bg-blue-500 rounded-full"></div>
+                     <h2 className="text-xs font-bold text-blue-200 uppercase tracking-widest">Yönetim</h2>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2">
+                    {amirList.map(member => (
+                      <button key={member.name} onClick={() => handleLoginClick(member, 'AMIR')} className="group relative bg-slate-800/50 hover:bg-blue-600 border border-white/5 p-4 rounded-2xl text-left font-bold transition-all duration-300 flex justify-between items-center overflow-hidden">
+                        <div className="absolute inset-0 bg-blue-400/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
+                        <div className="text-slate-200 group-hover:text-white relative z-10 flex items-center gap-3">
+                            <div className="relative flex-shrink-0">
+                                {member.avatar ? (
+                                    <img src={member.avatar} className="w-6 h-6 rounded-full object-cover border border-slate-600" />
+                                ) : (
+                                    <i className="fas fa-user-tie text-blue-400 group-hover:text-white/80"></i>
+                                )}
+                                {isUserOnline(member.lastActive) && (
+                                    <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-green-500 border-2 border-slate-800 rounded-full"></span>
+                                )}
+                            </div>
+                            <div className="flex flex-col items-start min-w-0">
+                                <span className="flex items-center gap-2 truncate">
+                                    {member.name}
+                                    {member.password && <i className="fas fa-lock text-[10px] text-slate-500 group-hover:text-white/50"></i>}
                                 </span>
-                            )}
+                                {member.lastActive && (
+                                    <span className="text-[10px] font-normal text-slate-400 group-hover:text-blue-200 truncate">
+                                         {formatLastActive(member.lastActive)}
+                                    </span>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                    <i className="fas fa-arrow-right text-slate-600 group-hover:text-white relative z-10 opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0 ml-auto"></i>
-                  </button>
-                ))}
-              </div>
-            </section>
+                        <i className="fas fa-arrow-right text-slate-600 group-hover:text-white relative z-10 opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0 ml-auto"></i>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+                
+                <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+
+                <section>
+                  <div className="flex items-center gap-2 mb-3">
+                     <div className="w-1 h-4 bg-emerald-500 rounded-full"></div>
+                     <h2 className="text-xs font-bold text-emerald-200 uppercase tracking-widest">Saha Ekibi</h2>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2">
+                    {ustaList.map(member => (
+                      <button key={member.name} onClick={() => handleLoginClick(member, 'USTA')} className="group relative bg-slate-800/50 hover:bg-emerald-600 border border-white/5 p-4 rounded-2xl text-left font-bold transition-all duration-300 flex justify-between items-center overflow-hidden">
+                        <div className="absolute inset-0 bg-emerald-400/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
+                        <div className="text-slate-200 group-hover:text-white relative z-10 flex items-center gap-3">
+                            <div className="relative flex-shrink-0">
+                                {member.avatar ? (
+                                    <img src={member.avatar} className="w-6 h-6 rounded-full object-cover border border-slate-600" />
+                                ) : (
+                                    <i className="fas fa-wrench text-emerald-400 group-hover:text-white/80"></i>
+                                )}
+                                {isUserOnline(member.lastActive) && (
+                                    <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-green-500 border-2 border-slate-800 rounded-full"></span>
+                                )}
+                            </div>
+                            <div className="flex flex-col items-start min-w-0">
+                                <span className="flex items-center gap-2 truncate">
+                                    {member.name}
+                                    {member.password && <i className="fas fa-lock text-[10px] text-slate-500 group-hover:text-white/50"></i>}
+                                </span>
+                                {member.lastActive && (
+                                    <span className="text-[10px] font-normal text-slate-400 group-hover:text-emerald-200 truncate">
+                                         {formatLastActive(member.lastActive)}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        <i className="fas fa-arrow-right text-slate-600 group-hover:text-white relative z-10 opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0 ml-auto"></i>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              </>
+            )}
             
             {!connectionId && (
                 <div className="pt-4 text-center">
@@ -1215,8 +1278,17 @@ const App: React.FC = () => {
                     </button>
                 </div>
             )}
+
+            {/* Yükleniyor Göstergesi */}
+            {loading && (
+                 <div className="text-center py-10">
+                     <i className="fas fa-circle-notch fa-spin text-blue-500 text-2xl"></i>
+                     <p className="text-xs text-slate-500 mt-2">Veriler Yükleniyor...</p>
+                 </div>
+            )}
+
           </div>
-          <p className="text-center text-[10px] text-slate-600 mt-6 font-mono">v1.0.5 &bull; Hızlı Senkronizasyon</p>
+          <p className="text-center text-[10px] text-slate-600 mt-6 font-mono">v1.0.8 &bull; Hızlı Senkronizasyon</p>
         </div>
 
         {/* Login Password Modal */}
