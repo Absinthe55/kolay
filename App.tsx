@@ -23,6 +23,9 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('tasks');
   const [isLoading, setIsLoading] = useState(true);
   const [binId, setBinId] = useState('');
+  
+  // Sync State
+  const [isDirty, setIsDirty] = useState(false); // Yerel değişiklik var mı?
 
   // Forms
   const [newRequestContent, setNewRequestContent] = useState('');
@@ -77,6 +80,7 @@ const App: React.FC = () => {
           if (isValid) {
               setStoredBinId(currentId);
               setBinId(currentId);
+              setConnectionStatus('connected');
               await loadData(currentId);
           }
       }
@@ -95,17 +99,37 @@ const App: React.FC = () => {
       } catch (e) { console.error(e); }
   };
 
+  // --- POLLING & SAVING MECHANISM ---
+
+  // 1. POLLING: Her saniye veriyi güncelle (Eğer yerel değişiklik yoksa)
+  useEffect(() => {
+      if (!binId || connectionStatus !== 'connected') return;
+
+      const interval = setInterval(() => {
+          // Eğer kullanıcı bir şeyleri değiştiriyorsa (isDirty=true), sunucudan çekip üzerine yazma.
+          // Önce kaydetmesinin bitmesini bekle.
+          if (!isDirty) {
+              loadData(binId);
+          }
+      }, 1000);
+
+      return () => clearInterval(interval);
+  }, [binId, connectionStatus, isDirty]);
+
+  // 2. SAVING: Değişiklik olduğunda kaydet (Debounce ile)
   const saveAll = async () => {
       if (!binId) return;
       await saveAppData({ tasks, requests, leaves, amirs, ustas, deletedTasks }, binId);
+      setIsDirty(false); // Kayıt tamamlandı, tekrar veri çekmeye başlayabiliriz
   };
   
   useEffect(() => {
-      if(currentUser && binId) {
-          const timer = setTimeout(saveAll, 1000);
+      // Sadece yerel bir değişiklik yapıldıysa (isDirty) kaydet
+      if(currentUser && binId && isDirty) {
+          const timer = setTimeout(saveAll, 1000); // 1 saniye bekle (yazma bitince kaydet)
           return () => clearTimeout(timer);
       }
-  }, [tasks, requests, leaves, amirs, ustas, deletedTasks]);
+  }, [tasks, requests, leaves, amirs, ustas, deletedTasks, isDirty]);
 
   // --- ACTIONS ---
 
@@ -122,14 +146,19 @@ const App: React.FC = () => {
       };
       setRequests([newReq, ...requests]);
       setNewRequestContent('');
+      setIsDirty(true);
   };
 
   const handleRequestAction = (id: string, action: 'APPROVE' | 'REJECT' | 'DELETE') => {
       if (action === 'DELETE') {
-          if(window.confirm("Silinsin mi?")) setRequests(requests.filter(r => r.id !== id));
+          if(window.confirm("Silinsin mi?")) {
+              setRequests(requests.filter(r => r.id !== id));
+              setIsDirty(true);
+          }
       } else {
           const newStatus = action === 'APPROVE' ? RequestStatus.APPROVED : RequestStatus.REJECTED;
           setRequests(requests.map(r => r.id === id ? { ...r, status: newStatus } : r));
+          setIsDirty(true);
       }
   };
 
@@ -155,9 +184,10 @@ const App: React.FC = () => {
       setNewTaskDescription('');
       setNewTaskMaster('');
       setActiveTab('tasks');
+      setIsDirty(true);
   };
 
-  // ... (Existing personnel & task handlers kept same logic, just linked) ...
+  // ... (Existing personnel & task handlers) ...
   const handleAddMember = () => {
       if (!newMemberName.trim()) return;
       const newMember: Member = {
@@ -169,12 +199,14 @@ const App: React.FC = () => {
       if (newMemberRole === 'AMIR') setAmirs([...amirs, newMember]);
       else setUstas([...ustas, newMember]);
       setNewMemberName(''); setNewMemberPassword(''); setNewMemberPhone('');
+      setIsDirty(true);
   };
 
   const handleRemoveMember = (name: string, role: 'AMIR'|'USTA') => {
       if (!window.confirm("Silinecek?")) return;
       if (role === 'AMIR') setAmirs(amirs.filter(m => m.name !== name));
       else setUstas(ustas.filter(m => m.name !== name));
+      setIsDirty(true);
   };
 
   const handleRenameMember = () => {
@@ -182,15 +214,20 @@ const App: React.FC = () => {
     const updateList = (list: Member[]) => list.map(m => m.name === renameModal.oldName ? { ...m, name: renameInput.trim() } : m);
     if (renameModal.role === 'AMIR') setAmirs(updateList(amirs)); else setUstas(updateList(ustas));
     setRenameModal(null); setRenameInput('');
+    setIsDirty(true);
   };
   const handlePasswordChange = () => {
     if (!passwordChangeModal) return;
     const updateList = (list: Member[]) => list.map(m => m.name === passwordChangeModal.memberName ? { ...m, password: newPasswordInput.trim() } : m);
     if (passwordChangeModal.role === 'AMIR') setAmirs(updateList(amirs)); else setUstas(updateList(ustas));
     setPasswordChangeModal(null); setNewPasswordInput('');
+    setIsDirty(true);
   };
 
-  const handleTaskMarkSeen = (taskId: string) => setTasks(tasks.map(t => t.id === taskId ? { ...t, seenAt: Date.now() } : t));
+  const handleTaskMarkSeen = (taskId: string) => {
+      setTasks(tasks.map(t => t.id === taskId ? { ...t, seenAt: Date.now() } : t));
+      setIsDirty(true);
+  };
   const handleTaskStatusChange = (taskId: string, status: TaskStatus) => {
       setTasks(tasks.map(t => {
           if (t.id !== taskId) return t;
@@ -199,6 +236,7 @@ const App: React.FC = () => {
           if (status === TaskStatus.COMPLETED) updates.completedAt = Date.now();
           return { ...t, ...updates };
       }));
+      setIsDirty(true);
   };
   const handleTaskDelete = (taskId: string) => {
       if (!window.confirm("Silinecek?")) return;
@@ -206,9 +244,13 @@ const App: React.FC = () => {
       if (task) {
           setDeletedTasks([...deletedTasks, { ...task, deletedAt: Date.now() }]);
           setTasks(tasks.filter(t => t.id !== taskId));
+          setIsDirty(true);
       }
   };
-  const handleTaskComment = (taskId: string, comment: string) => setTasks(tasks.map(t => t.id === taskId ? { ...t, comments: (t.comments ? t.comments + '\n' : '') + comment } : t));
+  const handleTaskComment = (taskId: string, comment: string) => {
+      setTasks(tasks.map(t => t.id === taskId ? { ...t, comments: (t.comments ? t.comments + '\n' : '') + comment } : t));
+      setIsDirty(true);
+  };
   
   // Leaves
   const handleAddLeave = (start: string, end: string, reason: string) => {
@@ -217,9 +259,18 @@ const App: React.FC = () => {
       const diffDays = Math.ceil(Math.abs(d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)) + 1; 
       const newLeave: LeaveRequest = { id: Math.random().toString(36).substr(2, 9), ustaName: currentUser.name, startDate: start, endDate: end, daysCount: diffDays, reason, status: RequestStatus.PENDING, createdAt: Date.now() };
       setLeaves([...leaves, newLeave]);
+      setIsDirty(true);
   };
-  const handleUpdateLeaveStatus = (id: string, status: RequestStatus) => setLeaves(leaves.map(l => l.id === id ? { ...l, status } : l));
-  const handleDeleteLeave = (id: string) => { if(window.confirm("Silinecek?")) setLeaves(leaves.filter(l => l.id !== id)); };
+  const handleUpdateLeaveStatus = (id: string, status: RequestStatus) => {
+      setLeaves(leaves.map(l => l.id === id ? { ...l, status } : l));
+      setIsDirty(true);
+  };
+  const handleDeleteLeave = (id: string) => { 
+      if(window.confirm("Silinecek?")) {
+          setLeaves(leaves.filter(l => l.id !== id));
+          setIsDirty(true);
+      }
+  };
 
   // Login/Connect
   const handleLogin = (user: Member, role: 'AMIR' | 'USTA') => {
@@ -239,7 +290,7 @@ const App: React.FC = () => {
   };
   const handleCreateGroup = async () => {
       const newId = await createNewBin([{ name: 'Yönetici', password: '123' }], []);
-      if (newId) { setStoredBinId(newId); setBinId(newId); await loadData(newId); alert(`Grup ID: ${newId}`); }
+      if (newId) { setStoredBinId(newId); setBinId(newId); setConnectionStatus('connected'); await loadData(newId); alert(`Grup ID: ${newId}`); }
   };
 
   // --- RENDER HELPERS ---
