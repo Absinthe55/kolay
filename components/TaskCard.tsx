@@ -20,139 +20,134 @@ const TaskCard: React.FC<TaskCardProps> = ({
   onDelete,
   onAddComment
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false); // Default expanded
   const [comment, setComment] = useState('');
 
-  // Otomatik Görüldü İşaretleme
+  // Mark seen logic
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
-    // Arşivlenmişse veya collapsed ise işaretleme
-    if (!isCollapsed && !isArchived && user.role === 'USTA' && task.masterName === user.name && !task.seenAt && onMarkSeen) {
-        timer = setTimeout(() => {
-            onMarkSeen(task.id);
-        }, 500); // Gecikme 500ms'ye düşürüldü (Daha hızlı tepki)
+    if (!isArchived && user.role === 'USTA' && task.masterName === user.name && !task.seenAt && onMarkSeen) {
+        timer = setTimeout(() => { onMarkSeen(task.id); }, 500);
     }
-    return () => {
-        if (timer) clearTimeout(timer);
-    };
-  }, [isCollapsed, user.role, task.masterName, user.name, task.seenAt, task.id, onMarkSeen, isArchived]);
+    return () => { if (timer) clearTimeout(timer); };
+  }, [user.role, task.masterName, user.name, task.seenAt, task.id, onMarkSeen, isArchived]);
 
-  const getPriorityColor = (p: TaskPriority) => {
-    switch(p) {
-        case TaskPriority.CRITICAL: return 'text-red-500 border-red-500/50 bg-red-900/20';
-        case TaskPriority.HIGH: return 'text-orange-500 border-orange-500/50 bg-orange-900/20';
-        case TaskPriority.MEDIUM: return 'text-blue-500 border-blue-500/50 bg-blue-900/20';
-        default: return 'text-slate-400 border-slate-600/50 bg-slate-800';
-    }
+  const priorityStyles = {
+    [TaskPriority.CRITICAL]: 'bg-red-500/20 text-red-400 border-red-500/30',
+    [TaskPriority.HIGH]: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+    [TaskPriority.MEDIUM]: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    [TaskPriority.LOW]: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
   };
 
-  const getStatusColor = (s: TaskStatus) => {
-      switch(s) {
-          case TaskStatus.COMPLETED: return 'text-emerald-500';
-          case TaskStatus.IN_PROGRESS: return 'text-blue-500';
-          case TaskStatus.CANCELLED: return 'text-slate-500';
-          default: return 'text-amber-500';
-      }
+  const statusStyles = {
+      [TaskStatus.COMPLETED]: 'border-emerald-500/50 from-emerald-900/20 to-emerald-900/5',
+      [TaskStatus.IN_PROGRESS]: 'border-blue-500/50 from-blue-900/20 to-blue-900/5',
+      [TaskStatus.PENDING]: 'border-slate-700 from-slate-800/50 to-slate-900/50',
+      [TaskStatus.CANCELLED]: 'border-red-900/50 opacity-60 grayscale',
   };
 
   const handleAddComment = () => {
-      if (comment.trim() && onAddComment) {
-          onAddComment(task.id, comment);
-          setComment('');
-      }
+      if (comment.trim() && onAddComment) { onAddComment(task.id, comment); setComment(''); }
   };
 
   return (
-    <div className={`bg-slate-800 rounded-xl border border-slate-700 p-4 mb-3 transition-all ${task.status === TaskStatus.COMPLETED ? 'opacity-75' : ''} ${task.seenAt ? 'border-l-4 border-l-slate-700' : 'border-l-4 border-l-blue-500'}`}>
-      {/* Header */}
-      <div className="flex justify-between items-start cursor-pointer" onClick={() => setIsCollapsed(!isCollapsed)}>
-         <div className="flex-1">
-             <div className="flex items-center gap-2 mb-1">
-                <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${getPriorityColor(task.priority)}`}>
-                    {task.priority}
-                </span>
-                <span className={`text-[9px] font-bold ${getStatusColor(task.status)}`}>
-                    {task.status}
-                </span>
-                {task.seenAt && <i className="fas fa-eye text-[10px] text-slate-500" title="Görüldü"></i>}
-             </div>
-             <h3 className="text-slate-200 font-bold text-sm">{task.machineName}</h3>
-             <p className="text-[10px] text-slate-500">
-                {new Date(task.createdAt).toLocaleDateString('tr-TR')} • {task.masterName}
-             </p>
-         </div>
-         <div className="ml-2">
-             <i className={`fas fa-chevron-${isCollapsed ? 'down' : 'up'} text-slate-500 text-xs`}></i>
-         </div>
-      </div>
+    <div className={`relative rounded-3xl border overflow-hidden transition-all duration-300 bg-gradient-to-br backdrop-blur-sm ${statusStyles[task.status]} ${task.status === TaskStatus.COMPLETED ? 'shadow-none' : 'shadow-lg'}`}>
       
-      {!isCollapsed && (
-          <div className="mt-3 pt-3 border-t border-slate-700/50 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-              <p className="text-sm text-slate-300 bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 whitespace-pre-wrap">
-                  {task.description}
-              </p>
-              
-              {task.image && (
-                  <div className="rounded-lg overflow-hidden border border-slate-700/50">
-                      <img src={task.image} alt="Task attachment" className="w-full h-auto object-cover max-h-60" />
-                  </div>
-              )}
+      {/* Status Bar Indicator */}
+      <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${task.status === TaskStatus.COMPLETED ? 'bg-emerald-500' : task.status === TaskStatus.IN_PROGRESS ? 'bg-blue-500' : 'bg-slate-600'}`}></div>
 
+      <div className="p-5 pl-7">
+          {/* Header */}
+          <div className="flex justify-between items-start mb-3" onClick={() => setIsCollapsed(!isCollapsed)}>
+              <div>
+                  <div className="flex items-center gap-2 mb-2">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${priorityStyles[task.priority]}`}>
+                          {task.priority}
+                      </span>
+                      {task.seenAt && user.role === 'AMIR' && (
+                          <span className="text-[10px] text-blue-400 font-bold flex items-center gap-1 bg-blue-900/30 px-2 py-0.5 rounded border border-blue-900/50">
+                              <i className="fas fa-check-double"></i> Görüldü
+                          </span>
+                      )}
+                  </div>
+                  <h3 className={`text-lg font-black leading-tight ${task.status === TaskStatus.COMPLETED ? 'text-slate-400 line-through' : 'text-slate-100'}`}>
+                      {task.machineName}
+                  </h3>
+              </div>
+              
+              {/* Status Icon */}
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 text-lg ${
+                  task.status === TaskStatus.COMPLETED ? 'bg-emerald-500 border-emerald-400 text-white' : 
+                  task.status === TaskStatus.IN_PROGRESS ? 'bg-blue-600 border-blue-400 text-white animate-pulse' : 
+                  'bg-slate-800 border-slate-600 text-slate-500'
+              }`}>
+                  <i className={`fas ${
+                      task.status === TaskStatus.COMPLETED ? 'fa-check' : 
+                      task.status === TaskStatus.IN_PROGRESS ? 'fa-cog fa-spin' : 
+                      'fa-hourglass-start'
+                  }`}></i>
+              </div>
+          </div>
+
+          {/* Details (Collapsible) */}
+          <div className={`transition-all duration-300 ${isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[500px] opacity-100'}`}>
+              <div className="bg-slate-950/30 rounded-xl p-4 border border-white/5 mb-4">
+                  <p className="text-sm text-slate-300 font-medium leading-relaxed">{task.description}</p>
+              </div>
+
+              <div className="flex items-center gap-4 text-xs text-slate-500 font-bold uppercase tracking-wider mb-4">
+                  <span><i className="far fa-clock mr-1"></i> {new Date(task.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                  <span><i className="far fa-user mr-1"></i> {task.masterName}</span>
+              </div>
+
+              {/* Comments */}
               {task.comments && (
-                  <div className="bg-slate-900/30 p-2 rounded-lg text-xs text-slate-400 italic border border-slate-800">
-                      <i className="fas fa-comment-alt mr-1"></i> {task.comments}
+                  <div className="mb-4 pl-3 border-l-2 border-slate-600">
+                      <p className="text-xs text-slate-400 italic">"{task.comments}"</p>
                   </div>
               )}
-              
-              {/* Actions */}
-              <div className="flex flex-col gap-2 pt-2">
-                  {user.role === 'USTA' && task.status === TaskStatus.PENDING && (
-                      <button 
-                        onClick={() => onStatusChange && onStatusChange(task.id, TaskStatus.IN_PROGRESS)}
-                        className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors"
-                      >
-                          Başla
-                      </button>
-                  )}
-                  
-                  {user.role === 'USTA' && task.status === TaskStatus.IN_PROGRESS && (
-                       <button 
-                        onClick={() => onStatusChange && onStatusChange(task.id, TaskStatus.COMPLETED)}
-                        className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors"
-                      >
-                          Tamamla
-                      </button>
+
+              {/* Controls */}
+              <div className="pt-2 border-t border-white/5 space-y-3">
+                  {/* USTA Controls */}
+                  {user.role === 'USTA' && task.status !== TaskStatus.COMPLETED && (
+                      <div className="flex gap-3">
+                          {task.status === TaskStatus.PENDING && (
+                              <button onClick={() => onStatusChange && onStatusChange(task.id, TaskStatus.IN_PROGRESS)} className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-bold shadow-lg shadow-blue-900/40 transition-all active:scale-95">
+                                  BAŞLA
+                              </button>
+                          )}
+                          {task.status === TaskStatus.IN_PROGRESS && (
+                              <button onClick={() => onStatusChange && onStatusChange(task.id, TaskStatus.COMPLETED)} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-bold shadow-lg shadow-emerald-900/40 transition-all active:scale-95">
+                                  TAMAMLA
+                              </button>
+                          )}
+                      </div>
                   )}
 
-                  {/* Comments Input */}
-                  <div className="flex gap-2">
-                      <input 
-                        type="text" 
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                        placeholder="Not ekle..."
-                        className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-blue-500"
-                      />
-                      <button 
-                        onClick={handleAddComment}
-                        disabled={!comment.trim()}
-                        className="px-3 py-1 bg-slate-700 text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-600 disabled:opacity-50"
-                      >
-                          Ekle
-                      </button>
-                  </div>
-                  
+                  {/* Comment Input */}
+                  {(task.status === TaskStatus.IN_PROGRESS || user.role === 'AMIR') && (
+                      <div className="flex gap-2">
+                          <input 
+                              type="text" 
+                              value={comment} 
+                              onChange={e => setComment(e.target.value)} 
+                              placeholder="Not ekle..." 
+                              className="flex-1 bg-slate-900/50 border border-slate-700 rounded-lg px-3 text-xs text-white outline-none focus:border-blue-500"
+                          />
+                          <button onClick={handleAddComment} disabled={!comment.trim()} className="px-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-bold disabled:opacity-50">OK</button>
+                      </div>
+                  )}
+
+                  {/* AMIR Delete */}
                   {user.role === 'AMIR' && (
-                      <button 
-                        onClick={() => onDelete && onDelete(task.id)}
-                        className="w-full py-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/30 rounded-lg text-xs font-bold transition-colors mt-2"
-                      >
-                          Görevi Sil
+                      <button onClick={() => onDelete && onDelete(task.id)} className="w-full py-2 text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg transition-colors">
+                          <i className="fas fa-trash-alt mr-1"></i> GÖREVİ SİL
                       </button>
                   )}
               </div>
           </div>
-      )}
+      </div>
     </div>
   );
 };
