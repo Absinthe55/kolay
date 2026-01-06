@@ -51,6 +51,9 @@ const App: React.FC = () => {
   // Login
   const [loginInput, setLoginInput] = useState('');
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'checking' | 'connected' | 'error'>('idle');
+  const [pendingLogin, setPendingLogin] = useState<{ member: Member, role: 'AMIR' | 'USTA' } | null>(null);
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
 
   const amirList = amirs;
   const ustaList = ustas;
@@ -60,19 +63,6 @@ const App: React.FC = () => {
   }, []);
 
   const initApp = async () => {
-      // OTOMATİK GİRİŞ İPTAL EDİLDİ: Kullanıcılar her seferinde oturum seçebilmeli.
-      /*
-      const storedAuth = localStorage.getItem(LOCAL_KEY_AUTH);
-      if (storedAuth) {
-          try {
-              const authUser = JSON.parse(storedAuth);
-              if (authUser && authUser.name && authUser.role) {
-                  setCurrentUser(authUser);
-              }
-          } catch (e) { console.error(e); }
-      }
-      */
-
       let currentId = getStoredBinId() || AUTO_CONNECT_ID;
 
       if (currentId) {
@@ -101,13 +91,10 @@ const App: React.FC = () => {
 
   // --- POLLING & SAVING MECHANISM ---
 
-  // 1. POLLING: Her saniye veriyi güncelle (Eğer yerel değişiklik yoksa)
   useEffect(() => {
       if (!binId || connectionStatus !== 'connected') return;
 
       const interval = setInterval(() => {
-          // Eğer kullanıcı bir şeyleri değiştiriyorsa (isDirty=true), sunucudan çekip üzerine yazma.
-          // Önce kaydetmesinin bitmesini bekle.
           if (!isDirty) {
               loadData(binId);
           }
@@ -116,17 +103,15 @@ const App: React.FC = () => {
       return () => clearInterval(interval);
   }, [binId, connectionStatus, isDirty]);
 
-  // 2. SAVING: Değişiklik olduğunda kaydet (Debounce ile)
   const saveAll = async () => {
       if (!binId) return;
       await saveAppData({ tasks, requests, leaves, amirs, ustas, deletedTasks }, binId);
-      setIsDirty(false); // Kayıt tamamlandı, tekrar veri çekmeye başlayabiliriz
+      setIsDirty(false);
   };
   
   useEffect(() => {
-      // Sadece yerel bir değişiklik yapıldıysa (isDirty) kaydet
       if(currentUser && binId && isDirty) {
-          const timer = setTimeout(saveAll, 1000); // 1 saniye bekle (yazma bitince kaydet)
+          const timer = setTimeout(saveAll, 1000);
           return () => clearTimeout(timer);
       }
   }, [tasks, requests, leaves, amirs, ustas, deletedTasks, isDirty]);
@@ -187,7 +172,6 @@ const App: React.FC = () => {
       setIsDirty(true);
   };
 
-  // ... (Existing personnel & task handlers) ...
   const handleAddMember = () => {
       if (!newMemberName.trim()) return;
       const newMember: Member = {
@@ -273,11 +257,36 @@ const App: React.FC = () => {
   };
 
   // Login/Connect
-  const handleLogin = (user: Member, role: 'AMIR' | 'USTA') => {
-      const loggedUser: User = { id: user.name, name: user.name, role, avatar: user.avatar };
-      setCurrentUser(loggedUser);
-      // localStorage.setItem(LOCAL_KEY_AUTH, JSON.stringify(loggedUser)); // Auto-login disabled
+  const handleLoginClick = (member: Member, role: 'AMIR' | 'USTA') => {
+      // Eğer şifre atanmamışsa direkt giriş yap
+      if (!member.password) {
+          performLogin(member, role);
+          return;
+      }
+      // Şifre varsa şifre sorma ekranına geç
+      setPendingLogin({ member, role });
+      setLoginPassword('');
+      setLoginError('');
   };
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!pendingLogin) return;
+      
+      if (pendingLogin.member.password === loginPassword) {
+          performLogin(pendingLogin.member, pendingLogin.role);
+      } else {
+          setLoginError('Hatalı şifre. Lütfen tekrar deneyin.');
+          setLoginPassword('');
+      }
+  };
+
+  const performLogin = (member: Member, role: 'AMIR' | 'USTA') => {
+      const loggedUser: User = { id: member.name, name: member.name, role, avatar: member.avatar };
+      setCurrentUser(loggedUser);
+      setPendingLogin(null);
+  };
+
   const handleLogout = () => { setCurrentUser(null); localStorage.removeItem(LOCAL_KEY_AUTH); };
   const handleDisconnect = () => { setBinId(''); setStoredBinId(''); handleLogout(); };
 
@@ -366,12 +375,15 @@ const App: React.FC = () => {
                            <p className="text-xs font-bold text-blue-400 uppercase mb-3 pl-1 tracking-wider">Yöneticiler</p>
                            <div className="space-y-2">
                                {amirs.map(m => (
-                                   <button key={m.name} onClick={() => handleLogin(m, 'AMIR')} className="w-full flex items-center gap-4 bg-slate-800/80 p-3 rounded-2xl border border-slate-700 hover:border-blue-500 hover:bg-slate-700 transition-all group">
+                                   <button key={m.name} onClick={() => handleLoginClick(m, 'AMIR')} className="w-full flex items-center gap-4 bg-slate-800/80 p-3 rounded-2xl border border-slate-700 hover:border-blue-500 hover:bg-slate-700 transition-all group">
                                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-blue-400 flex items-center justify-center text-white font-bold text-lg shadow-lg">
                                            {m.avatar ? <img src={m.avatar} className="w-full h-full object-cover rounded-xl" /> : m.name[0]}
                                        </div>
-                                       <span className="text-slate-100 font-bold text-lg group-hover:text-white">{m.name}</span>
-                                       <i className="fas fa-chevron-right ml-auto text-slate-600 group-hover:text-blue-400"></i>
+                                       <div className="flex-1 text-left">
+                                           <p className="text-slate-100 font-bold text-lg leading-none">{m.name}</p>
+                                           {m.password && <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-widest"><i className="fas fa-lock mr-1"></i> Şifreli</p>}
+                                       </div>
+                                       <i className="fas fa-chevron-right text-slate-600 group-hover:text-blue-400"></i>
                                    </button>
                                ))}
                                {amirs.length === 0 && <p className="text-sm text-slate-500 italic text-center py-2">Yönetici bulunamadı.</p>}
@@ -385,12 +397,15 @@ const App: React.FC = () => {
                            <p className="text-xs font-bold text-emerald-400 uppercase mb-3 pl-1 tracking-wider">Teknik Personel</p>
                            <div className="space-y-2">
                                {ustas.map(m => (
-                                   <button key={m.name} onClick={() => handleLogin(m, 'USTA')} className="w-full flex items-center gap-4 bg-slate-800/80 p-3 rounded-2xl border border-slate-700 hover:border-emerald-500 hover:bg-slate-700 transition-all group">
+                                   <button key={m.name} onClick={() => handleLoginClick(m, 'USTA')} className="w-full flex items-center gap-4 bg-slate-800/80 p-3 rounded-2xl border border-slate-700 hover:border-emerald-500 hover:bg-slate-700 transition-all group">
                                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-400 flex items-center justify-center text-white font-bold text-lg shadow-lg">
                                            {m.avatar ? <img src={m.avatar} className="w-full h-full object-cover rounded-xl" /> : m.name[0]}
                                        </div>
-                                       <span className="text-slate-100 font-bold text-lg group-hover:text-white">{m.name}</span>
-                                       <i className="fas fa-chevron-right ml-auto text-slate-600 group-hover:text-emerald-400"></i>
+                                       <div className="flex-1 text-left">
+                                           <p className="text-slate-100 font-bold text-lg leading-none">{m.name}</p>
+                                           {m.password && <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-widest"><i className="fas fa-lock mr-1"></i> Şifreli</p>}
+                                       </div>
+                                       <i className="fas fa-chevron-right text-slate-600 group-hover:text-emerald-400"></i>
                                    </button>
                                ))}
                                {ustas.length === 0 && <p className="text-sm text-slate-500 italic text-center py-2">Personel bulunamadı.</p>}
@@ -398,6 +413,48 @@ const App: React.FC = () => {
                        </div>
                    </div>
                </div>
+
+               {/* Password Entry Modal */}
+               {pendingLogin && (
+                   <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[100] flex items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-200">
+                       <div className="w-full max-w-sm bg-slate-900 border border-white/10 rounded-3xl p-8 shadow-2xl relative">
+                           <button onClick={() => setPendingLogin(null)} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center">
+                               <i className="fas fa-times"></i>
+                           </button>
+                           
+                           <div className="text-center mb-8">
+                               <div className="w-20 h-20 bg-gradient-to-br from-slate-800 to-slate-900 border border-white/5 rounded-full mx-auto mb-4 flex items-center justify-center shadow-xl overflow-hidden">
+                                   {pendingLogin.member.avatar ? <img src={pendingLogin.member.avatar} className="w-full h-full object-cover" /> : <span className="text-3xl font-black text-white">{pendingLogin.member.name[0]}</span>}
+                               </div>
+                               <h3 className="text-xl font-black text-white">{pendingLogin.member.name}</h3>
+                               <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Lütfen Şifrenizi Girin</p>
+                           </div>
+
+                           <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                               <div className="relative">
+                                   <i className="fas fa-key absolute left-4 top-4 text-slate-500"></i>
+                                   <input 
+                                       type="password" 
+                                       autoFocus
+                                       placeholder="••••••"
+                                       className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-12 pr-4 py-4 text-white outline-none focus:border-blue-500 transition-colors text-center tracking-[0.5em] font-mono"
+                                       value={loginPassword}
+                                       onChange={e => { setLoginPassword(e.target.value); setLoginError(''); }}
+                                   />
+                               </div>
+                               
+                               {loginError && <p className="text-red-500 text-[10px] font-bold text-center bg-red-500/10 py-2 rounded-lg">{loginError}</p>}
+                               
+                               <button 
+                                   type="submit"
+                                   className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-xl shadow-lg shadow-blue-900/40 active:scale-95 transition-all"
+                               >
+                                   OTURUMU AÇ
+                               </button>
+                           </form>
+                       </div>
+                   </div>
+               )}
           </div>
       );
   }
@@ -405,12 +462,9 @@ const App: React.FC = () => {
   // 2. MAIN APP
   const getDisplayTasks = () => {
       let filtered = tasks;
-      
-      // GÜVENLİK: Usta sadece kendisine atanan görevleri görebilmeli
       if (currentUser?.role === 'USTA') {
           filtered = tasks.filter(t => t.masterName === currentUser.name);
       }
-
       const priorityOrder = { [TaskPriority.CRITICAL]: 0, [TaskPriority.HIGH]: 1, [TaskPriority.MEDIUM]: 2, [TaskPriority.LOW]: 3 };
       return [...filtered].sort((a, b) => {
           if (priorityOrder[a.priority] !== priorityOrder[b.priority]) return priorityOrder[a.priority] - priorityOrder[b.priority];
@@ -725,7 +779,7 @@ const App: React.FC = () => {
             <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6 z-50">
                 <div className="bg-slate-800 p-6 rounded-2xl w-full max-w-sm border border-slate-700 shadow-2xl">
                     <h3 className="text-white font-bold mb-4">Şifre Değiştir</h3>
-                    <input type="text" placeholder="Yeni Şifre" value={newPasswordInput} onChange={e => setNewPasswordInput(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white mb-4 outline-none" />
+                    <input type="password" placeholder="Yeni Şifre" value={newPasswordInput} onChange={e => setNewPasswordInput(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white mb-4 outline-none" />
                     <div className="flex justify-end gap-2">
                         <button onClick={() => setPasswordChangeModal(null)} className="px-4 py-2 text-slate-400 font-bold text-sm">İptal</button>
                         <button onClick={handlePasswordChange} className="px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-sm">Kaydet</button>
