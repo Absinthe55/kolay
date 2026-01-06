@@ -99,7 +99,8 @@ const App: React.FC = () => {
             window.history.pushState({ tab }, '', `#${tab}`);
         }
     } catch (e) {
-        console.warn('History API error:', e);
+        // Sandbox ortamlarında (örn: AI Studio Preview) history API kısıtlı olabilir.
+        // Hata oluşursa kullanıcı deneyimini bozmamak için loglamıyoruz.
     }
   }, []);
 
@@ -898,7 +899,20 @@ const App: React.FC = () => {
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTaskMachine || !newTaskDescription || !newTaskMaster) return;
+    
+    // Gelişmiş Validasyon
+    if (!newTaskMachine.trim()) {
+        alert("Lütfen makine adı veya bölge bilgisini giriniz.");
+        return;
+    }
+    if (!newTaskMaster) {
+        alert("Lütfen görevi atayacağınız personeli seçiniz.");
+        return;
+    }
+    if (!newTaskDescription.trim()) {
+        alert("Lütfen yapılacak işin detaylarını giriniz.");
+        return;
+    }
 
     const newTask: Task = {
       id: Date.now().toString(),
@@ -1300,7 +1314,7 @@ const App: React.FC = () => {
             )}
 
           </div>
-          <p className="text-center text-[10px] text-slate-600 mt-6 font-mono">v1.0.9 &bull; Hızlı Senkronizasyon</p>
+          <p className="text-center text-[10px] text-slate-600 mt-6 font-mono">v1.0.10 &bull; Hızlı Senkronizasyon</p>
         </div>
 
         {/* Login Password Modal */}
